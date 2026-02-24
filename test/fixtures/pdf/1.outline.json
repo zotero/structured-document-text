@@ -1,0 +1,120 @@
+[
+  {
+    "title": "Trace-based Just-in-Time Type Specialization for Dynamic Languages",
+    "startRef": "0"
+  },
+  {
+    "title": "Abstract",
+    "startRef": "7"
+  },
+  {
+    "title": "1. Introduction",
+    "startRef": "12"
+  },
+  {
+    "title": "2. Overview: Example Tracing Run",
+    "startRef": "35"
+  },
+  {
+    "title": "3. Trace Trees",
+    "startRef": "48",
+    "children": [
+      {
+        "title": "3.1 Traces",
+        "startRef": "50"
+      },
+      {
+        "title": "3.2 Trace Trees",
+        "startRef": "71"
+      },
+      {
+        "title": "3.3 Blacklisting",
+        "startRef": "87"
+      }
+    ]
+  },
+  {
+    "title": "4. Nested Trace Tree Formation",
+    "startRef": "95",
+    "children": [
+      {
+        "title": "4.1 Nesting Algorithm",
+        "startRef": "109"
+      },
+      {
+        "title": "4.2 Blacklisting with Nesting",
+        "startRef": "118"
+      }
+    ]
+  },
+  {
+    "title": "5. Trace Tree Optimization",
+    "startRef": "122",
+    "children": [
+      {
+        "title": "5.1 Optimizations",
+        "startRef": "124"
+      }
+    ]
+  },
+  {
+    "title": "6. Implementation",
+    "startRef": "140",
+    "children": [
+      {
+        "title": "6.1 Calling Compiled Traces",
+        "startRef": "146"
+      },
+      {
+        "title": "5.2 Register Allocation",
+        "startRef": "133"
+      },
+      {
+        "title": "6.2 Trace Stitching",
+        "startRef": "152"
+      },
+      {
+        "title": "6.3 Trace Recording",
+        "startRef": "157"
+      },
+      {
+        "title": "6.4 Preemption",
+        "startRef": "168"
+      },
+      {
+        "title": "6.5 Calling External Functions",
+        "startRef": "173"
+      }
+    ]
+  },
+  {
+    "title": "7. Evaluation",
+    "startRef": "189",
+    "children": [
+      {
+        "title": "6.6 Correctness",
+        "startRef": "184"
+      }
+    ]
+  },
+  {
+    "title": "8. Related Work",
+    "startRef": "210"
+  },
+  {
+    "title": "9. Conclusions",
+    "startRef": "223"
+  },
+  {
+    "title": "10. Future Work",
+    "startRef": "226"
+  },
+  {
+    "title": "Acknowledgments",
+    "startRef": "229"
+  },
+  {
+    "title": "References",
+    "startRef": "241"
+  }
+]

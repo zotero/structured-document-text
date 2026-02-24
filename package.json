@@ -1,0 +1,12 @@
+{
+  "name": "structured-document-text",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "./src/index.js",
+  "scripts": {
+    "test": "node --test 'test/**/*.test.js'",
+    "test:update": "UPDATE=1 node --test 'test/**/*.test.js'"
+  },
+  "private": true
+}
