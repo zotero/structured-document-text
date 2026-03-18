@@ -1,0 +1,104 @@
+[
+  {
+    "title": "Cover",
+    "startRef": "0"
+  },
+  {
+    "title": "Half Title",
+    "startRef": "1"
+  },
+  {
+    "title": "Title Page",
+    "startRef": "4"
+  },
+  {
+    "title": "Copyright Page",
+    "startRef": "8"
+  },
+  {
+    "title": "Dedication",
+    "startRef": "29"
+  },
+  {
+    "title": "Table of Contents",
+    "startRef": "30"
+  },
+  {
+    "title": "Acknowledgements",
+    "startRef": "33"
+  },
+  {
+    "title": "Introduction: The Joys of Forgetting, Reinventing and Coping with the Archive Fever",
+    "startRef": "37"
+  },
+  {
+    "title": "I New Frontiers? Between Absence and Presence of Archives",
+    "startRef": "76",
+    "children": [
+      {
+        "title": "1 What Are Film Archives For? (and Why We Need Them to Change), or: Adventures in the Archive World",
+        "startRef": "79"
+      },
+      {
+        "title": "2 Viewing the Ottoman Lands in Early Travel Films",
+        "startRef": "122"
+      },
+      {
+        "title": "3 How Social Media Platforms Replace Film Archives When There Are No Archives",
+        "startRef": "188"
+      },
+      {
+        "title": "4 The Intersecting Paths of Eveline T. Scott and Traugott Fuchs: How Do Private Collections Speak to Us?",
+        "startRef": "243"
+      }
+    ]
+  },
+  {
+    "title": "II The God of Small Films, or what you Have Found is not what you Have Lost",
+    "startRef": "315",
+    "children": [
+      {
+        "title": "5 The Ethics of Appropriation: Found Footage between Archive and Internet",
+        "startRef": "318"
+      },
+      {
+        "title": "6 The Infra-ordinary Archive: On Turkish 8 mm Home Movies",
+        "startRef": "319"
+      },
+      {
+        "title": "7 Interview with Gustav Deutsch: “Categorisation Limits”",
+        "startRef": "365"
+      },
+      {
+        "title": "8 Old Footage, New Meanings: The Case of The Atomic Cafe",
+        "startRef": "530"
+      }
+    ]
+  },
+  {
+    "title": "III What the Prints (don’t) Tell",
+    "startRef": "618",
+    "children": [
+      {
+        "title": "9 Preservation and Resignation: A Study of Survival",
+        "startRef": "621"
+      },
+      {
+        "title": "10 Memory and Trust in a Time of Un-framing Film Heritage",
+        "startRef": "622"
+      },
+      {
+        "title": "11 “Uncontained” Archives of Cinema",
+        "startRef": "674"
+      }
+    ]
+  },
+  {
+    "title": "Bibliography",
+    "startRef": "737"
+  },
+  {
+    "title": "Index",
+    "startRef": "740"
+  }
+]

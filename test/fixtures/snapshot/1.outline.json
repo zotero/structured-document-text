@@ -1,0 +1,22 @@
+[
+  {
+    "title": "Main Title",
+    "startRef": "0",
+    "children": [
+      {
+        "title": "Section One",
+        "startRef": "2"
+      },
+      {
+        "title": "Section Two",
+        "startRef": "5",
+        "children": [
+          {
+            "title": "Subsection",
+            "startRef": "7"
+          }
+        ]
+      }
+    ]
+  }
+]

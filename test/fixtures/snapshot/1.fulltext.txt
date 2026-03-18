@@ -1,0 +1,39 @@
+Main Title
+
+First paragraph with bold and italic text.
+
+Section One
+
+Some content in section one.
+
+Item one
+Item two
+Item three
+
+Section Two
+
+Content with a link.
+
+Subsection
+
+Deeper content.
+
+A quoted passage.
+
+Header 1
+Header 2
+Cell 1
+Cell 2
+
+Navigation Heading
+
+This should be excluded from outline.
+
+Sidebar Heading
+
+This should also be excluded from outline.
+
+Footer Heading
+
+Code block
+with preserved whitespace

@@ -5,8 +5,12 @@
   "type": "module",
   "main": "./src/index.js",
   "scripts": {
+    "generate:types": "json2ts -i schema.json -o schema.d.ts && node scripts/fix-schema-types.js",
     "test": "node --test 'test/**/*.test.js'",
     "test:update": "UPDATE=1 node --test 'test/**/*.test.js'"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "json-schema-to-typescript": "^15.0.4"
+  }
 }
