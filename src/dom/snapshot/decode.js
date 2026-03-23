@@ -1,3 +1,5 @@
+import { nfcToOriginal, nfcToOriginalLocal } from '../deltamap.js';
+
 /**
  * Snapshot selectorMap decode utilities.
  *
@@ -88,11 +90,12 @@ export function parseSelectorMapEntries(selectorMap) {
  * Handles both single-entry and multi-entry (merged) selectorMaps.
  *
  * @param {string} selectorMap - absolute CSS selector (optionally with offset), or multi-entry
- * @param {number} start - start character index (inclusive, relative to text node)
- * @param {number} end - end character index (exclusive, relative to text node)
+ * @param {number} start - start character index (inclusive, relative to text node, in NFC space)
+ * @param {number} end - end character index (exclusive, relative to text node, in NFC space)
+ * @param {string} [deltaMap] - optional NFC deltaMap for position translation
  * @returns {{ type: string, value: string, refinedBy: { type: string, start: number, end: number } }}
  */
-export function resolveSelectorMap(selectorMap, start, end) {
+export function resolveSelectorMap(selectorMap, start, end, deltaMap) {
 	let entries = parseSelectorMapEntries(selectorMap);
 	if (entries) {
 		let cumulative = 0;
@@ -101,22 +104,44 @@ export function resolveSelectorMap(selectorMap, start, end) {
 				let localStart = start - cumulative;
 				let localEnd = (end !== undefined ? end : start + 1) - cumulative;
 				localEnd = Math.min(localEnd, entry.length);
-				return resolveSelectorMap(entry.selectorMap, localStart, localEnd);
+				// Translate local NFC offsets to original offsets
+				let origLocalStart = nfcToOriginalLocal(deltaMap, cumulative, localStart);
+				let origLocalEnd = nfcToOriginalLocal(deltaMap, cumulative, localEnd);
+				return resolveSingleEntry(entry.selectorMap, origLocalStart, origLocalEnd);
 			}
 			cumulative += entry.length;
 		}
 		let last = entries[entries.length - 1];
-		return resolveSelectorMap(last.selectorMap, last.length, last.length);
+		let origLen = nfcToOriginalLocal(deltaMap, cumulative - last.length, last.length);
+		return resolveSingleEntry(last.selectorMap, origLen, origLen);
 	}
 
+	let origStart = nfcToOriginal(deltaMap, start);
+	let origEnd = nfcToOriginal(deltaMap, end !== undefined ? end : start + 1);
 	let { selector, offset } = parseSelectorMap(selectorMap);
 	return {
 		type: 'CssSelector',
 		value: selector,
 		refinedBy: {
 			type: 'TextPositionSelector',
-			start: offset + start,
-			end: offset + (end !== undefined ? end : start + 1),
+			start: offset + origStart,
+			end: offset + origEnd,
+		},
+	};
+}
+
+/**
+ * Resolve a single-entry selectorMap (already in original/DOM space).
+ */
+function resolveSingleEntry(selectorMap, origStart, origEnd) {
+	let { selector, offset } = parseSelectorMap(selectorMap);
+	return {
+		type: 'CssSelector',
+		value: selector,
+		refinedBy: {
+			type: 'TextPositionSelector',
+			start: offset + origStart,
+			end: offset + origEnd,
 		},
 	};
 }

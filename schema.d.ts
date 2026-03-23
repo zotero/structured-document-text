@@ -269,6 +269,10 @@ export interface DomAnchor {
    * Compact location string. Blocks: absolute (EPUB CFI path starting with '/', or snapshot CSS selector). Text nodes: relative to parent block (EPUB CFI suffix, snapshot offset / child suffix / empty).
    */
   selectorMap: string;
+  /**
+   * NFC normalization position map. Space-separated 'nfcPos delta' pairs where delta = nfcIdx - origIdx changes. Absent when text is already NFC (all positions 1:1). Decode: origPos = nfcPos - getDelta(deltaMap, nfcPos).
+   */
+  deltaMap?: string;
 }
 /**
  * Heading block (inline text only).

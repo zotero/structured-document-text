@@ -1,3 +1,5 @@
+import { nfcToOriginal, nfcToOriginalLocal } from '../deltamap.js';
+
 /**
  * EPUB selectorMap decode utilities.
  *
@@ -60,22 +62,6 @@ export function parseSelectorMapEntries(selectorMap) {
 }
 
 /**
- * Find which entry contains a character offset (0-based).
- * Returns the entry's CFI path and the local offset within that entry.
- */
-function findEntryAt(entries, offset) {
-	let cumulative = 0;
-	for (let i = 0; i < entries.length; i++) {
-		if (offset < cumulative + entries[i].length) {
-			return { path: entries[i].path, local: offset - cumulative };
-		}
-		cumulative += entries[i].length;
-	}
-	let last = entries[entries.length - 1];
-	return { path: last.path, local: last.length };
-}
-
-/**
  * Resolve a character range to a CFI range.
  * Handles both single-entry and multi-entry (merged) selectorMaps.
  *
@@ -84,47 +70,72 @@ function findEntryAt(entries, offset) {
  * @param {number} end - end character index (exclusive)
  * @returns {{ type: string, conformsTo: string, value: string }}
  */
-export function resolveSelectorMap(selectorMap, start, end) {
+/**
+ * @param {string} selectorMap - absolute CFI path or multi-entry selectorMap
+ * @param {number} start - start character index (inclusive, NFC space)
+ * @param {number} [end] - end character index (exclusive, NFC space)
+ * @param {string} [deltaMap] - optional NFC deltaMap for position translation
+ */
+export function resolveSelectorMap(selectorMap, start, end, deltaMap) {
 	let entries = parseSelectorMapEntries(selectorMap);
 	if (entries) {
-		return resolveMultiEntry(entries, start, end !== undefined ? end : start + 1);
+		return resolveMultiEntry(entries, start, end !== undefined ? end : start + 1, deltaMap);
 	}
 
-	if (end === undefined || end === start + 1) {
+	let origStart = nfcToOriginal(deltaMap, start);
+	let origEnd = nfcToOriginal(deltaMap, end !== undefined ? end : start + 1);
+	if (origEnd === origStart + 1) {
 		return {
 			type: 'FragmentSelector',
 			conformsTo: CONFORMSTO,
-			value: `epubcfi(${selectorMap}:${start})`,
+			value: `epubcfi(${selectorMap}:${origStart})`,
 		};
 	}
 	return {
 		type: 'FragmentSelector',
 		conformsTo: CONFORMSTO,
-		value: `epubcfi(${selectorMap},:${start},:${end})`,
+		value: `epubcfi(${selectorMap},:${origStart},:${origEnd})`,
 	};
 }
 
-function resolveMultiEntry(entries, start, end) {
-	let s = findEntryAt(entries, start);
-	let e = findEntryAt(entries, end - 1);
-	let endLocal = e.local + 1;
+function resolveMultiEntry(entries, start, end, deltaMap) {
+	let sEntry = findEntryAtWithCumulative(entries, start);
+	let eEntry = findEntryAtWithCumulative(entries, end - 1);
 
-	if (s.path === e.path) {
-		if (endLocal === s.local + 1) {
+	let origStartLocal = nfcToOriginalLocal(deltaMap, sEntry.cumulative, sEntry.local);
+	let origEndLocal = nfcToOriginalLocal(deltaMap, eEntry.cumulative, eEntry.local) + 1;
+
+	if (sEntry.path === eEntry.path) {
+		if (origEndLocal === origStartLocal + 1) {
 			return {
 				type: 'FragmentSelector',
 				conformsTo: CONFORMSTO,
-				value: `epubcfi(${s.path}:${s.local})`,
+				value: `epubcfi(${sEntry.path}:${origStartLocal})`,
 			};
 		}
 		return {
 			type: 'FragmentSelector',
 			conformsTo: CONFORMSTO,
-			value: `epubcfi(${s.path},:${s.local},:${endLocal})`,
+			value: `epubcfi(${sEntry.path},:${origStartLocal},:${origEndLocal})`,
 		};
 	}
 
-	return resolveSelectorMapRange(s.path, s.local, e.path, endLocal);
+	return resolveSelectorMapRange(sEntry.path, origStartLocal, eEntry.path, origEndLocal);
+}
+
+/**
+ * Like findEntryAt but also returns the cumulative offset for deltaMap translation.
+ */
+function findEntryAtWithCumulative(entries, offset) {
+	let cumulative = 0;
+	for (let i = 0; i < entries.length; i++) {
+		if (offset < cumulative + entries[i].length) {
+			return { path: entries[i].path, local: offset - cumulative, cumulative };
+		}
+		cumulative += entries[i].length;
+	}
+	let last = entries[entries.length - 1];
+	return { path: last.path, local: last.length, cumulative: cumulative - last.length };
 }
 
 /**

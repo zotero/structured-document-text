@@ -3,6 +3,7 @@
  */
 
 import { deepEqual } from './utils.js';
+import { mergeDeltaMaps } from './dom/deltamap.js';
 
 function canMerge(a, b) {
 	let aAnc = a.anchor ?? null;
@@ -58,8 +59,9 @@ export function mergeTextNodes(textNodes) {
  */
 function isDomAnchor(anchor) {
 	if (!anchor || typeof anchor !== 'object') return false;
+	if (typeof anchor.selectorMap !== 'string') return false;
 	let keys = Object.keys(anchor);
-	return keys.length === 1 && keys[0] === 'selectorMap' && typeof anchor.selectorMap === 'string';
+	return keys.every(k => k === 'selectorMap' || k === 'deltaMap');
 }
 
 /**
@@ -130,11 +132,23 @@ export function mergeNodesWithSelectorMap(content) {
 		}
 
 		// Combine selectorMaps: "len1 path1\nlen2 path2"
+		let nfcLenBefore = current.text.length;
 		if (current.anchor.selectorMap !== node.anchor.selectorMap) {
-			current.anchor = {
+			let newAnchor = {
 				selectorMap: toEntries(current.anchor.selectorMap, current.text.length)
 					+ '\n' + toEntries(node.anchor.selectorMap, node.text.length),
 			};
+			current.anchor = newAnchor;
+		}
+
+		// Combine deltaMaps
+		let mergedDelta = mergeDeltaMaps(
+			current.anchor.deltaMap,
+			node.anchor.deltaMap,
+			nfcLenBefore,
+		);
+		if (mergedDelta) {
+			current.anchor.deltaMap = mergedDelta;
 		}
 
 		current.text += node.text;

@@ -36,5 +36,5 @@ export function getFulltextFromStructuredText(structure, pageIndexes) {
 		}
 	}
 
-	return blockTexts.join('\n\n').trim().normalize('NFC');
+	return blockTexts.join('\n\n').trim();
 }

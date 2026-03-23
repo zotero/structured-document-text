@@ -37,3 +37,20 @@ Footer Heading
 
 Code block
 with preserved whitespace
+
+NFC Stress Tests
+
+Café lattés are nice.
+
+Viet Nam: Hṍ Chí Minh
+
+Korean: 한글
+
+Normal text, café is NFC but café is NFD, then more normal.
+
+Español and Swedish: ångström
+
+ÀB́ĈD̃Ë
+
+NFC: café
+NFD: café
