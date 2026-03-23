@@ -1,4 +1,4 @@
-import { getNestedBlockPlainText } from './pdf/text-node.js';
+import { getNestedBlockPlainText } from './text.js';
 
 /**
  * Convert a structure object into a fulltext string for the given page indexes.

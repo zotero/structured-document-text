@@ -2,33 +2,7 @@
  * Text node utilities for merging, comparing, and extracting content.
  */
 
-function deepEqual(a, b) {
-	if (a === b) return true;
-	if (a == null || b == null) return false;
-
-	const aIsArray = Array.isArray(a);
-	const bIsArray = Array.isArray(b);
-	if (aIsArray || bIsArray) {
-		if (!aIsArray || !bIsArray || a.length !== b.length) return false;
-		for (let i = 0; i < a.length; i++) {
-			if (!deepEqual(a[i], b[i])) return false;
-		}
-		return true;
-	}
-
-	if (typeof a !== 'object' || typeof b !== 'object') return false;
-
-	const aKeys = Object.keys(a);
-	const bKeys = Object.keys(b);
-	if (aKeys.length !== bKeys.length) return false;
-
-	for (const key of aKeys) {
-		if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
-		if (!deepEqual(a[key], b[key])) return false;
-	}
-
-	return true;
-}
+import { deepEqual } from '../utils.js';
 
 /**
  * Check if two text nodes can be merged (same style, refs, target).
@@ -128,56 +102,4 @@ export function mergeSequentialTextNodes(content) {
 	content.length = 0;
 	content.push(...merged);
 	return content;
-}
-
-/**
- * Get plain text content from a leaf block (flat content).
- */
-export function getBlockPlainText(block) {
-	const nodes = Array.isArray(block?.content) ? block.content : [];
-	if (nodes.length === 0) {
-		return '';
-	}
-
-	let text = '';
-	for (const node of nodes) {
-		if (node && typeof node.text === 'string') {
-			text += node.text;
-		}
-	}
-
-	return text;
-}
-
-/**
- * Get plain text from a block, recursing into nested blocks (e.g. lists containing listitems).
- */
-export function getNestedBlockPlainText(node) {
-	if (!node) return '';
-	if (typeof node.text === 'string') return node.text;
-	if (!Array.isArray(node.content)) return '';
-
-	const hasChildBlock = node.content.some(
-		child => child && typeof child.text !== 'string'
-	);
-
-	if (!hasChildBlock) {
-		let result = '';
-		for (const child of node.content) {
-			if (child && typeof child.text === 'string') {
-				result += child.text;
-			}
-		}
-		return result;
-	}
-
-	const parts = [];
-	for (const child of node.content) {
-		if (!child || typeof child.text === 'string') continue;
-		const text = getNestedBlockPlainText(child);
-		if (text) {
-			parts.push(text);
-		}
-	}
-	return parts.join('\n');
 }

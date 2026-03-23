@@ -14,7 +14,8 @@ export { charsToTextNodes, charsToPreformattedTextNodes } from './encode.js';
 export { parseTextMap, reconstructCharPositions, buildRunData } from './decode.js';
 
 // Text node utilities
-export { canMergeTextNodes, mergeSequentialTextNodes, getBlockPlainText, getNestedBlockPlainText } from './text-node.js';
+export { canMergeTextNodes, mergeSequentialTextNodes } from './text-node.js';
+export { getBlockPlainText, getNestedBlockPlainText } from '../text.js';
 
 // Block reading (navigation, text, cursors)
 export {

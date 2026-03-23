@@ -1,4 +1,4 @@
-import { getNestedBlockPlainText } from './pdf/text-node.js';
+import { getNestedBlockPlainText } from './text.js';
 
 /**
  * Flatten outline hierarchy into an ordered list of { blockIndex, path }.
