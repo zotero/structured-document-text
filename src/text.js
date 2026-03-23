@@ -54,6 +54,100 @@ export function mergeTextNodes(textNodes) {
 }
 
 /**
+ * Check if an anchor is a DomAnchor (only has `selectorMap` string property).
+ */
+function isDomAnchor(anchor) {
+	if (!anchor || typeof anchor !== 'object') return false;
+	let keys = Object.keys(anchor);
+	return keys.length === 1 && keys[0] === 'selectorMap' && typeof anchor.selectorMap === 'string';
+}
+
+/**
+ * Convert a single-entry selectorMap to entry format: "charLen selectorMap".
+ * Multi-entry selectorMaps (starting with a digit) are returned as-is.
+ */
+function toEntries(selectorMap, textLen) {
+	if (/^\d/.test(selectorMap)) return selectorMap;
+	return textLen + ' ' + selectorMap;
+}
+
+/**
+ * Merge adjacent text nodes with DomAnchors that share the same
+ * style, refs, backRefs, and target — combining their selectorMaps into
+ * a multi-entry format. This is the DOM equivalent of
+ * pdf/text-node.js:mergeSequentialTextNodes.
+ *
+ * Must be called AFTER cross-reference resolution (refs/backRefs/targets
+ * are finalized), not during initial extraction.
+ *
+ * Mutates content in-place.
+ */
+export function mergeNodesWithSelectorMap(content) {
+	if (!Array.isArray(content) || content.length === 0) {
+		return content;
+	}
+
+	let merged = [];
+	let current = null;
+	let copied = false;
+
+	function finalize() {
+		if (current) merged.push(current);
+		current = null;
+		copied = false;
+	}
+
+	for (let node of content) {
+		let isTextNode = node && typeof node.text === 'string';
+
+		if (!isTextNode) {
+			finalize();
+			merged.push(node);
+			continue;
+		}
+
+		if (!current) {
+			current = node;
+			copied = false;
+			continue;
+		}
+
+		// Only merge if both have DomAnchors and style/refs/target match
+		if (!isDomAnchor(current.anchor) || !isDomAnchor(node.anchor)
+			|| !deepEqual(current.style ?? null, node.style ?? null)
+			|| !deepEqual(current.refs ?? null, node.refs ?? null)
+			|| !deepEqual(current.backRefs ?? null, node.backRefs ?? null)
+			|| !deepEqual(current.target ?? null, node.target ?? null)) {
+			finalize();
+			current = node;
+			copied = false;
+			continue;
+		}
+
+		if (!copied) {
+			current = { ...current };
+			copied = true;
+		}
+
+		// Combine selectorMaps: "len1 path1\nlen2 path2"
+		if (current.anchor.selectorMap !== node.anchor.selectorMap) {
+			current.anchor = {
+				selectorMap: toEntries(current.anchor.selectorMap, current.text.length)
+					+ '\n' + toEntries(node.anchor.selectorMap, node.text.length),
+			};
+		}
+
+		current.text += node.text;
+	}
+
+	finalize();
+
+	content.length = 0;
+	content.push(...merged);
+	return content;
+}
+
+/**
  * Get plain text from a leaf block (flat content).
  */
 export function getBlockPlainText(block) {

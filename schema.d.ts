@@ -122,9 +122,9 @@ export type RefsArray = RefPath[];
  */
 export type BackRefsArray = RefPath[];
 /**
- * Link from this node back to the source document. Format depends on source type: PDF uses pageRects/textMap, EPUB uses WADM FragmentSelector with CFI, snapshots use WADM CssSelector optionally refined by TextPositionSelector.
+ * Link from this node back to the source document. PDF uses PdfAnchor (pageRects/textMap). EPUB and snapshot use DomAnchor with a selectorMap field that compactly encodes source locations. Use the dom/epub and dom/snapshot decode modules to expand and resolve.
  */
-export type Anchor = PdfAnchor | FragmentSelector | CssSelector;
+export type Anchor = PdfAnchor | DomAnchor;
 /**
  * PDF source anchor with page geometry and/or text layout map. `textMap` validation is intentionally permissive (string-only); consumers should parse and validate decoded run structure at runtime.
  */
@@ -262,43 +262,13 @@ export interface TextStyle {
   monospace?: boolean;
 }
 /**
- * W3C Web Annotation Data Model FragmentSelector. Used for EPUB CFI anchors.
+ * Compact anchor for EPUB and snapshot blocks and text nodes. For blocks, selectorMap is an absolute location: EPUB CFI path (starts with '/') or snapshot CSS selector. For text nodes, selectorMap is relative to the parent block: EPUB stores a CFI suffix, snapshot stores '' (same element), a bare offset, a ' > child' suffix, or an absolute selector fallback. Multi-entry selectorMaps (from merged adjacent text nodes) are newline-separated 'charLen selectorMap' entries starting with a digit. Use expandSelectorMap() to resolve relative values and expandBlockAnchor() to reconstruct WADM selectors.
  */
-export interface FragmentSelector {
-  type: "FragmentSelector";
+export interface DomAnchor {
   /**
-   * Fragment specification URI.
+   * Compact location string. Blocks: absolute (EPUB CFI path starting with '/', or snapshot CSS selector). Text nodes: relative to parent block (EPUB CFI suffix, snapshot offset / child suffix / empty).
    */
-  conformsTo: "http://www.idpf.org/epub/linking/cfi/epub-cfi.html";
-  /**
-   * Fragment identifier (e.g. EPUB CFI string).
-   */
-  value: string;
-}
-/**
- * W3C Web Annotation Data Model CssSelector. Identifies an element via a CSS selector, optionally refined by a TextPositionSelector for sub-element targeting.
- */
-export interface CssSelector {
-  type: "CssSelector";
-  /**
-   * CSS selector string targeting a unique element relative to body.
-   */
-  value: string;
-  refinedBy?: TextPositionSelector;
-}
-/**
- * Optional TextPositionSelector refinement for sub-element text ranges.
- */
-export interface TextPositionSelector {
-  type: "TextPositionSelector";
-  /**
-   * Start character offset (inclusive).
-   */
-  start: number;
-  /**
-   * End character offset (exclusive).
-   */
-  end: number;
+  selectorMap: string;
 }
 /**
  * Heading block (inline text only).
