@@ -80,7 +80,7 @@ export type RefPath = [number, ...number[]];
 /**
  * Target location in the source or an external URL.
  */
-export type Target = Target & {
+export type Target = {
   /**
    * Position in the source document.
    */
@@ -128,7 +128,7 @@ export type Anchor = PdfAnchor | DomAnchor;
 /**
  * PDF source anchor with page geometry and/or text layout map. `textMap` validation is intentionally permissive (string-only); consumers should parse and validate decoded run structure at runtime.
  */
-export type PdfAnchor = PdfAnchor & {
+export type PdfAnchor = {
   /**
    * Bounding boxes on source pages.
    *

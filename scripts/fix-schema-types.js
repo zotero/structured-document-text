@@ -57,9 +57,12 @@ src = result.join('\n');
 // 4. Rewrite remaining references to numbered types back to base names
 src = src.replace(/\b(RefPath|RefsArray|BackRefsArray|Target|PdfAnchor)(\d+)\b/g, '$1');
 
-// 5. Fix PageRect tuple: unknown -> number
+// 5. Fix circular self-references created by step 4 (e.g. "type Target = Target & {" → "type Target = {")
+src = src.replace(/export type (\w+) = \1 & \{/g, 'export type $1 = {');
+
+// 6. Fix PageRect tuple: unknown -> number
 src = src.replace(
-	/export type PageRect = \[unknown, unknown, unknown, unknown, unknown\]/,
+	/export type PageRect = \[unknown, unknown, unknown, unknown, unknown]/,
 	'export type PageRect = [number, number, number, number, number]'
 );
 
