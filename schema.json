@@ -42,7 +42,7 @@
     },
     "sourceContentType": {
       "type": "string",
-      "enum": ["application/pdf", "application/epub+zip", "text/html"],
+      "enum": ["application/pdf", "application/epub+zip", "text/html", "application/xhtml+xml"],
       "description": "MIME type of the source."
     },
     "sourceHash": {

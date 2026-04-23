@@ -33,7 +33,7 @@ export interface StructuredDocumentText {
   /**
    * MIME type of the source.
    */
-  sourceContentType: "application/pdf" | "application/epub+zip" | "text/html";
+  sourceContentType: "application/pdf" | "application/epub+zip" | "text/html" | "application/xhtml+xml";
   /**
    * MD5 hash of the source file (32-char hex string) used to detect changes.
    */
