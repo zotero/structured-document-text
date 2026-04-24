@@ -89,8 +89,49 @@ function optimizeRun(run, maxError = 0.25) {
 
 // ───────────────────────────── Char → TextNode ─────────────────────────────
 
+// Some PDFs express diacritics like the umlaut on "ï" as clusters like " ̈"
+// (U+0020 + combining mark), with a rect is positioned so the mark floats over
+// the next glyph. Left alone, this puts a space codepoint in the text that
+// has a real runData position - confusing mappers that treat whitespace as
+// virtual - and causes the combining mark to attach to the preceding char in
+// rendering rather than the following one. Rewrite these clusters by stripping
+// the leading space and moving the combining-mark "char" to immediately after
+// the next char, so the mark contributes one text unit per runData entry
+// and attaches to its intended base. Flags are shifted onto the mark so the
+// virtual space, if any, lands after the full cluster.
+function reorderLeadingSpaceClusters(chars) {
+	const out = [];
+	for (let i = 0; i < chars.length; i++) {
+		const ch = chars[i];
+		const next = chars[i + 1];
+		if (ch.c.length > 1 && ch.c[0] === ' ' && next) {
+			out.push({ ...next, spaceAfter: false, lineBreakAfter: false });
+			out.push({
+				...ch,
+				c: ch.c.slice(1),
+				spaceAfter: !!next.spaceAfter || !!ch.spaceAfter,
+				lineBreakAfter: !!next.lineBreakAfter || !!ch.lineBreakAfter,
+			});
+			i++;
+		}
+		else if (ch.c.length > 1 && ch.c[0] === ' ') {
+			// No following char to attach to
+			// Strip the space anyway to keep runData alignment;
+			// the mark will render on the preceding glyph
+			// TODO: Is this correct?
+			out.push({ ...ch, c: ch.c.slice(1) });
+		}
+		else {
+			out.push(ch);
+		}
+	}
+	return out;
+}
+
 export function charsToTextNodes(pageIndex, chars) {
 	if (!chars?.length) return [];
+
+	chars = reorderLeadingSpaceClusters(chars);
 
 	const nodes = [];
 	let node = null;
