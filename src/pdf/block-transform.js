@@ -5,6 +5,8 @@
 import {
 	HEADER_AXIS_DIR_SHIFT,
 	HEADER_LAST_IS_SOFT_HYPHEN,
+	EPS,
+	isVertical,
 } from './constants.js';
 import { parseTextMap, reconstructCharPositions } from './decode.js';
 import { canMergeTextNodes, mergeSequentialTextNodes } from './text-node.js';
@@ -34,16 +36,13 @@ function sliceTextMap(textMap, startOffset, endOffset) {
 			continue;
 		}
 
-		const [header, ...rest] = run;
-		const positions = reconstructCharPositions(run);
-		const hasSoftHyphen = header & HEADER_LAST_IS_SOFT_HYPHEN;
-
-		if (hasSoftHyphen) {
-			positions.pop();
-		}
+		const [header, pageIndex, minX, minY, maxX, maxY] = run;
+		const allPositions = reconstructCharPositions(run);
+		const hasSoftHyphen = !!(header & HEADER_LAST_IS_SOFT_HYPHEN);
+		const charPositions = hasSoftHyphen ? allPositions.slice(0, -1) : allPositions;
 
 		const runStart = charIndex;
-		const runEnd = charIndex + positions.length;
+		const runEnd = charIndex + charPositions.length;
 
 		// Skip runs completely outside range
 		if (runEnd <= startOffset || runStart >= endOffset) {
@@ -53,22 +52,34 @@ function sliceTextMap(textMap, startOffset, endOffset) {
 
 		// Calculate slice boundaries within this run
 		const sliceStart = Math.max(0, startOffset - runStart);
-		const sliceEnd = Math.min(positions.length, endOffset - runStart);
-		const slicedPositions = positions.slice(sliceStart, sliceEnd);
+		const sliceEnd = Math.min(charPositions.length, endOffset - runStart);
+		const slicedPositions = charPositions.slice(sliceStart, sliceEnd);
 
 		if (slicedPositions.length > 0) {
-			// Rebuild run with sliced positions
-			const newHeader = sliceEnd === positions.length && hasSoftHyphen
+			const keepSoftHyphen = hasSoftHyphen && sliceEnd === charPositions.length;
+			const newHeader = keepSoftHyphen
 				? header
 				: header & ~HEADER_LAST_IS_SOFT_HYPHEN;
 
-			const newRun = [newHeader, ...rest.slice(0, 5)];
-
-			// Add sliced position data
-			for (const pos of slicedPositions) {
-				if (pos && Number.isFinite(pos.x1) && Number.isFinite(pos.x2)) {
-					newRun.push(pos.x1, pos.x2);
+			// Re-encode sliced positions as per-glyph widths
+			const axisDir = (header >> HEADER_AXIS_DIR_SHIFT) & 0b11;
+			const vertical = isVertical(axisDir);
+			const newRun = [newHeader, pageIndex, minX, minY, maxX, maxY];
+			const emit = keepSoftHyphen
+				? [...slicedPositions, allPositions[allPositions.length - 1]]
+				: slicedPositions;
+			let pos = vertical ? minY : minX;
+			for (const emitPos of emit) {
+				if (!emitPos || !Number.isFinite(emitPos.x1) || !Number.isFinite(emitPos.x2)) continue;
+				const delta = emitPos.x1 - pos;
+				const width = emitPos.x2 - emitPos.x1;
+				if (Math.abs(delta) > EPS) {
+					newRun.push([delta, width]);
 				}
+				else {
+					newRun.push(width);
+				}
+				pos = emitPos.x2;
 			}
 
 			newRuns.push(newRun);
