@@ -188,9 +188,9 @@ export interface PageInfo {
    */
   textSource?: "born-digital" | "ocr";
   /**
-   * Quality flag for text extraction.
+   * True if this page's SDT extraction used a degraded path or should be treated as lower confidence due to text, layout, or structure extraction issues.
    */
-  textQuality?: "good" | "suspect" | "bad";
+  extractionDegraded?: boolean;
   /**
    * Human-readable page label (e.g. 'i', '15', 'A-3').
    */

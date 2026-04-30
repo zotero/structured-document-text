@@ -887,10 +887,9 @@
           "enum": ["born-digital", "ocr"],
           "description": "Source of text on this page."
         },
-        "textQuality": {
-          "type": "string",
-          "enum": ["good", "suspect", "bad"],
-          "description": "Quality flag for text extraction."
+        "extractionDegraded": {
+          "type": "boolean",
+          "description": "True if this page's SDT extraction used a degraded path or should be treated as lower confidence due to text, layout, or structure extraction issues."
         },
         "label": {
           "type": "string",
