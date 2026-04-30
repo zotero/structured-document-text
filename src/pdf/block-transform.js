@@ -692,31 +692,11 @@ export function mergeBlocks(structure, blockIndexes) {
 		return map;
 	};
 
-	const getTextMapLength = (node) => {
+	const getTextNodeLength = (node) => {
 		if (!node || typeof node.text !== 'string') {
 			return null;
 		}
-		const textMap = node.anchor?.textMap;
-		if (typeof textMap !== 'string') {
-			return null;
-		}
-		try {
-			const runs = JSON.parse(textMap);
-			if (!Array.isArray(runs)) {
-				return null;
-			}
-			let total = 0;
-			for (const run of runs) {
-				if (!Array.isArray(run) || run.length < 6) {
-					continue;
-				}
-				const widthCount = run.length - 6;
-				total += Math.max(1, widthCount);
-			}
-			return Number.isFinite(total) ? total : null;
-		} catch {
-			return null;
-		}
+		return node.text.length;
 	};
 
 	const mergeGroup = (group) => {
@@ -759,7 +739,7 @@ export function mergeBlocks(structure, blockIndexes) {
 			map[meta.childIndex] = currentMergedIndex;
 
 			if (isTextNode) {
-				const length = getTextMapLength(node);
+				const length = getTextNodeLength(node);
 				const offsetMap = ensureChildOffsetMap(meta.blockIndex);
 				if (length != null) {
 					offsetMap[meta.childIndex] = { offsetStart: currentTextOffset, length };

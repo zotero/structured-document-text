@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyTextAttributes } from '../src/pdf/block-transform.js';
+import { applyTextAttributes, mergeBlocks } from '../src/pdf/block-transform.js';
 import { parseTextMap, buildRunData } from '../src/pdf/decode.js';
 
 // Build a textMap with one position per non-whitespace character.
@@ -84,5 +84,48 @@ describe('applyTextAttributes textMap slicing', () => {
 		assert.deepEqual(after.map(r => [r.rect[0], r.rect[2]]),
 			[[25, 30], [30, 35], [40, 45], [45, 50]],
 			'after maps to e, f, g, h rects');
+	});
+});
+
+describe('mergeBlocks content range remapping', () => {
+	it('uses logical text lengths instead of textMap position counts', () => {
+		const textMap = makeTextMap([
+			{ x1: 0, x2: 5 },
+			{ x1: 10, x2: 15 },
+		]);
+		const structure = {
+			content: [
+				{
+					type: 'paragraph',
+					content: [{
+						text: 'a b',
+						anchor: { textMap },
+					}],
+				},
+				{
+					type: 'paragraph',
+					content: [{
+						text: 'c',
+						anchor: {
+							textMap: makeTextMap([{ x1: 20, x2: 25 }]),
+						},
+					}],
+				},
+			],
+			pages: [{
+				contentRanges: [{
+					start: { ref: [1, 0], offset: 0 },
+					end: { ref: [1, 0], offset: 0 },
+				}],
+			}],
+		};
+
+		mergeBlocks(structure, [[0, 1]]);
+
+		assert.equal(structure.content[0].content[0].text, 'a bc');
+		assert.deepEqual(structure.pages[0].contentRanges, [{
+			start: { ref: [0, 0], offset: 3 },
+			end: { ref: [0, 0], offset: 3 },
+		}]);
 	});
 });
