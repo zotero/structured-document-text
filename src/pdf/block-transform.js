@@ -11,7 +11,7 @@ import {
 import { parseTextMap, reconstructCharPositions } from './decode.js';
 import { canMergeTextNodes, mergeSequentialTextNodes } from './text-node.js';
 import { getBlockByRef, getContentRangeFromBlocks } from './block.js';
-import { sameRef } from './utils.js';
+import { isWhitespaceChar, sameRef } from './utils.js';
 
 function mergePageRects(blocks) {
 	const allRects = [];
@@ -22,11 +22,24 @@ function mergePageRects(blocks) {
 	return allRects.length > 0 ? allRects : null;
 }
 
-function sliceTextMap(textMap, startOffset, endOffset) {
+function sliceTextMap(textMap, text, startOffset, endOffset) {
 	const runs = parseTextMap(textMap);
 	if (!runs.length) {
 		return null;
 	}
+
+	// `startOffset` and `endOffset` are offsets into `text` (counting whitespace),
+	// while textMap runs encode one position per non-whitespace character. Convert
+	// text offsets to non-whitespace position offsets before slicing so the slice
+	// lines up with the right characters.
+	let nwStart = 0, nwEnd = 0;
+	for (let i = 0; i < endOffset; i++) {
+		if (isWhitespaceChar(text[i])) continue;
+		if (i < startOffset) nwStart++;
+		nwEnd++;
+	}
+	startOffset = nwStart;
+	endOffset = nwEnd;
 
 	const newRuns = [];
 	let charIndex = 0;
@@ -299,7 +312,7 @@ export function applyTextAttributes(structure, blockRef, offsetStart, offsetEnd,
 				};
 
 				if (hasAnchor && node.anchor) {
-					const slicedMap = sliceTextMap(node.anchor.textMap, 0, offsetStart - nodeStart);
+					const slicedMap = sliceTextMap(node.anchor.textMap, text, 0, offsetStart - nodeStart);
 					if (slicedMap) {
 						beforeNode.anchor = { ...node.anchor, textMap: slicedMap };
 					} else {
@@ -320,7 +333,7 @@ export function applyTextAttributes(structure, blockRef, offsetStart, offsetEnd,
 			};
 
 			if (hasAnchor && node.anchor) {
-				const slicedMap = sliceTextMap(node.anchor.textMap, rangeStart, rangeEnd);
+				const slicedMap = sliceTextMap(node.anchor.textMap, text, rangeStart, rangeEnd);
 				if (slicedMap) {
 					rangeNode.anchor = { ...node.anchor, textMap: slicedMap };
 				} else {
@@ -346,7 +359,7 @@ export function applyTextAttributes(structure, blockRef, offsetStart, offsetEnd,
 				};
 
 				if (hasAnchor && node.anchor) {
-					const slicedMap = sliceTextMap(node.anchor.textMap, offsetEnd - nodeStart + 1, text.length);
+					const slicedMap = sliceTextMap(node.anchor.textMap, text, offsetEnd - nodeStart + 1, text.length);
 					if (slicedMap) {
 						afterNode.anchor = { ...node.anchor, textMap: slicedMap };
 					} else {
