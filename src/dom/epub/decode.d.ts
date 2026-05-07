@@ -10,8 +10,10 @@ export function findCommonCFIPath(a: string, b: string): {
 	remainderB: string;
 };
 export function resolveSelectorMapRange(
-	startPath: string,
+	startSelectorMap: string,
 	startOffset: number,
-	endPath: string,
+	endSelectorMap: string,
 	endOffset: number,
+	startDeltaMap?: string,
+	endDeltaMap?: string,
 ): FragmentSelector;

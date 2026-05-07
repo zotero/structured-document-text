@@ -114,6 +114,35 @@ describe('EPUB decode: resolveSelectorMapRange', () => {
 		assert.equal(result.value,
 			'epubcfi(/6,/2[ch1.xhtml]!/2/4/1:100,/4[ch2.xhtml]!/2/2/1:0)');
 	});
+
+	it('resolves multi-entry start to specific sub-entry path', () => {
+		let multiEntry = '5 /6/2[ch1.xhtml]!/2/4/1\n10 /6/2[ch1.xhtml]!/2/4/2/1';
+		let result = resolveSelectorMapRange(
+			multiEntry, 7, '/6/4[ch2.xhtml]!/2/2/1', 0);
+		// offset 7 falls in the second sub-entry at local offset 2
+		assert.equal(result.value,
+			'epubcfi(/6,/2[ch1.xhtml]!/2/4/2/1:2,/4[ch2.xhtml]!/2/2/1:0)');
+	});
+
+	it('resolves multi-entry end to specific sub-entry path', () => {
+		let multiEntry = '5 /6/4[ch2.xhtml]!/2/2/1\n10 /6/4[ch2.xhtml]!/2/2/3';
+		let result = resolveSelectorMapRange(
+			'/6/2[ch1.xhtml]!/2/4/1', 100, multiEntry, 6);
+		// offset 6 falls in the second sub-entry at local offset 1
+		assert.equal(result.value,
+			'epubcfi(/6,/2[ch1.xhtml]!/2/4/1:100,/4[ch2.xhtml]!/2/2/3:1)');
+	});
+
+	it('translates NFC offsets to original via deltaMaps', () => {
+		// deltaMap "5 -1" means: at NFC pos 5 and beyond, delta = -1 (NFC is 1 char shorter)
+		// So NFC 7 → original 8
+		let result = resolveSelectorMapRange(
+			'/6/2[ch1.xhtml]!/2/4/1', 7,
+			'/6/4[ch2.xhtml]!/2/2/1', 3,
+			'5 -1', undefined);
+		assert.equal(result.value,
+			'epubcfi(/6,/2[ch1.xhtml]!/2/4/1:8,/4[ch2.xhtml]!/2/2/1:3)');
+	});
 });
 
 describe('EPUB decode: expandSelectorMap', () => {
@@ -131,6 +160,12 @@ describe('EPUB decode: expandSelectorMap', () => {
 		let multi = '6 /1\n5 /2/1\n1 /3';
 		assert.equal(expandSelectorMap(blockSM, multi),
 			'6 /6/2[ch1.xhtml]!/2/4/1\n5 /6/2[ch1.xhtml]!/2/4/2/1\n1 /6/2[ch1.xhtml]!/2/4/3');
+	});
+
+	it('returns block path when relative suffix is empty', () => {
+		// Top-level text-node blocks: the block path already targets the text
+		// node, so the relative suffix on the textAnchor is empty.
+		assert.equal(expandSelectorMap(blockSM, ''), blockSM);
 	});
 });
 

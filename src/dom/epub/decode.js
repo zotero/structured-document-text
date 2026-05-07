@@ -19,10 +19,12 @@ const CONFORMSTO = 'http://www.idpf.org/epub/linking/cfi/epub-cfi.html';
  * Expand a relative text node selectorMap to absolute paths using the block's selectorMap.
  *
  * @param {string} blockSelectorMap - the block's absolute CFI path
- * @param {string} selectorMap - relative selectorMap (suffix or multi-entry)
+ * @param {string} selectorMap - a relative selectorMap (suffix or multi-entry).
+ * 		An empty string means that the block path is already the text node path.
  * @returns {string} absolute selectorMap
  */
 export function expandSelectorMap(blockSelectorMap, selectorMap) {
+	if (!selectorMap) return blockSelectorMap;
 	let entries = parseSelectorMapEntries(selectorMap);
 	if (entries) {
 		return entries.map(e => e.length + ' ' + blockSelectorMap + e.path).join('\n');
@@ -166,21 +168,50 @@ export function findCommonCFIPath(a, b) {
 /**
  * Resolve a cross-node character range to a CFI range.
  *
- * @param {string} startPath - absolute CFI path for start text node
- * @param {number} startOffset - character offset in start node
- * @param {string} endPath - absolute CFI path for end text node
- * @param {number} endOffset - character offset in end node
+ * Each side accepts either an absolute CFI path or a multi-entry selectorMap;
+ * multi-entry inputs are resolved to a specific sub-entry based on the offset.
+ * If deltaMaps are supplied, offsets are translated from NFC to original space.
+ *
+ * @param {string} startSelectorMap - absolute CFI path or multi-entry selectorMap
+ * @param {number} startOffset - character offset in start node (NFC space if startDeltaMap provided)
+ * @param {string} endSelectorMap - absolute CFI path or multi-entry selectorMap
+ * @param {number} endOffset - character offset in end node (NFC space if endDeltaMap provided)
+ * @param {string} [startDeltaMap]
+ * @param {string} [endDeltaMap]
  */
-export function resolveSelectorMapRange(startPath, startOffset, endPath, endOffset) {
-	if (startPath === endPath) {
-		return resolveSelectorMap(startPath, startOffset, endOffset);
+export function resolveSelectorMapRange(
+	startSelectorMap, startOffset, endSelectorMap, endOffset,
+	startDeltaMap, endDeltaMap,
+) {
+	if (startSelectorMap === endSelectorMap) {
+		return resolveSelectorMap(startSelectorMap, startOffset, endOffset, startDeltaMap);
 	}
 
-	let { common, remainderA, remainderB } = findCommonCFIPath(startPath, endPath);
+	let start = resolveOnePoint(startSelectorMap, startOffset, startDeltaMap);
+	let end = resolveOnePoint(endSelectorMap, endOffset, endDeltaMap);
+
+	if (start.path === end.path) {
+		return {
+			type: 'FragmentSelector',
+			conformsTo: CONFORMSTO,
+			value: `epubcfi(${start.path},:${start.offset},:${end.offset})`,
+		};
+	}
+
+	let { common, remainderA, remainderB } = findCommonCFIPath(start.path, end.path);
 
 	return {
 		type: 'FragmentSelector',
 		conformsTo: CONFORMSTO,
-		value: `epubcfi(${common},${remainderA}:${startOffset},${remainderB}:${endOffset})`,
+		value: `epubcfi(${common},${remainderA}:${start.offset},${remainderB}:${end.offset})`,
 	};
+}
+
+function resolveOnePoint(selectorMap, offset, deltaMap) {
+	let entries = parseSelectorMapEntries(selectorMap);
+	if (entries) {
+		let { path, local, cumulative } = findEntryAtWithCumulative(entries, offset);
+		return { path, offset: nfcToOriginalLocal(deltaMap, cumulative, local) };
+	}
+	return { path: selectorMap, offset: nfcToOriginal(deltaMap, offset) };
 }
