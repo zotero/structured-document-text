@@ -29,12 +29,6 @@ Navigation Heading
 
 This should be excluded from outline.
 
-Sidebar Heading
-
-This should also be excluded from outline.
-
-Footer Heading
-
 Code block
 with preserved whitespace
 

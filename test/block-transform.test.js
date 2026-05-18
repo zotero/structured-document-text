@@ -112,20 +112,16 @@ describe('mergeBlocks content range remapping', () => {
 					}],
 				},
 			],
-			pages: [{
-				contentRanges: [{
-					start: { ref: [1, 0], offset: 0 },
-					end: { ref: [1, 0], offset: 0 },
+			catalog: {
+				pages: [{
+					contentRanges: [[[1, 0, 0], [1, 0, 0]]],
 				}],
-			}],
+			},
 		};
 
 		mergeBlocks(structure, [[0, 1]]);
 
 		assert.equal(structure.content[0].content[0].text, 'a bc');
-		assert.deepEqual(structure.pages[0].contentRanges, [{
-			start: { ref: [0, 0], offset: 3 },
-			end: { ref: [0, 0], offset: 3 },
-		}]);
+		assert.deepEqual(structure.catalog.pages[0].contentRanges, [[[0, 0, 3], [0, 0, 3]]]);
 	});
 });

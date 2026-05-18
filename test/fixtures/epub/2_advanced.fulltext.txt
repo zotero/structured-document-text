@@ -36,7 +36,7 @@ To Duncan McColl, Esq., R.N.,
 
 Huntly.
 
-     
+
 
 I
 
@@ -444,14 +444,14 @@ I glanced involuntarily towards the door.
 
 She began without more ado, standing in the middle of the room, with her back towards the door.
 
- Annie was dowie, an’ Willie was wae: 
- What can be the matter wi’ siccan a twae? 
- For Annie was bonnie’s the first o’ the day, 
- And Willie was strang an’ honest an’ gay. 
- Oh! the tane had a daddy was poor an’ was proud; 
- An’ the tither a minnie that cared for the gowd. 
- They lo’ed are anither, an’ said their say⁠— 
- But the daddy an’ minnie hae pairtit the twae. 
+ Annie was dowie, an’ Willie was wae:
+ What can be the matter wi’ siccan a twae?
+ For Annie was bonnie’s the first o’ the day,
+ And Willie was strang an’ honest an’ gay.
+ Oh! the tane had a daddy was poor an’ was proud;
+ An’ the tither a minnie that cared for the gowd.
+ They lo’ed are anither, an’ said their say⁠—
+ But the daddy an’ minnie hae pairtit the twae.
 
 Just as she finished the song, I saw the sharp eyes of Lady Lucy peeping in at the door.
 
@@ -485,22 +485,22 @@ I was lying on the floor of my room one midnight, with my face to the ground, wh
 
 I was in bed in a castle, on the seashore; the wind came from the sea in chill eerie soughs, and the waves fell with a threatful tone upon the beach, muttering many maledictions as they rushed up, and whispering cruel portents as they drew back, hissing and gurgling, through the million narrow ways of the pebbly ramparts; and I knew that a maiden in white was standing in the cold wind, by the angry sea, singing. I had a kind of dreamy belief in my dream; but, overpowered by the spell of the music, I still lay and listened. Keener and stronger, under the impulses of my will, grew the power of my hearing. At last I could distinguish the words. The ballad was Annie of Lochroyan; and Lady Alice was singing it. The words I heard were these:⁠—
 
- Oh, gin I had a bonnie ship, 
- And men to sail wi’ me, 
- It’s I wad gang to my true love, 
- Sin’ he winna come to me. 
- Lang stood she at her true love’s door, 
- And lang tirled at the pin; 
- At length up gat his fause mother, 
- Says, “Wha’s that wad be in?” 
- Love Gregory started frae his sleep, 
- And to his mother did say: 
- “I dreamed a dream this night, mither, 
- That maks my heart right wae. 
- “I dreamed that Annie of Lochroyan, 
- The flower of a’ her kin, 
- Was standing mournin’ at my door, 
- But nane wad let her in.” 
+ Oh, gin I had a bonnie ship,
+ And men to sail wi’ me,
+ It’s I wad gang to my true love,
+ Sin’ he winna come to me.
+ Lang stood she at her true love’s door,
+ And lang tirled at the pin;
+ At length up gat his fause mother,
+ Says, “Wha’s that wad be in?”
+ Love Gregory started frae his sleep,
+ And to his mother did say:
+ “I dreamed a dream this night, mither,
+ That maks my heart right wae.
+ “I dreamed that Annie of Lochroyan,
+ The flower of a’ her kin,
+ Was standing mournin’ at my door,
+ But nane wad let her in.”
 
 I sprang to my feet, and opened the hidden door. There she stood, white, asleep, with closed eyes, singing like a bird, only with a heartful of sad meaning in every tone. I stepped aside, without speaking, and she passed me into the room. I closed the door, and followed her. She lay already upon the couch, still and restful⁠—already covered with my plaid. I sat down beside her, waiting; and gazed upon her in wonderment. That she was possessed of very superior intellectual powers, whatever might be the cause of their having lain dormant so long, I had already fully convinced myself; but I was not prepared to find art as well as intellect. I had already heard her sing the little song of two verses, which she had learned from her nurse. But here was a song, of her own making as to the music, so true and so potent, that, before I knew anything of the words, it had surrounded me with a dream of the place in which the scene of the ballad was laid. It did not then occur to me that, perhaps, our idiosyncrasies were such as not to require even the music of the ballad for the production of rapport between our minds, the brain of the one generating in the brain of the other the vision present to itself.
 
@@ -662,23 +662,23 @@ I opened a book, and showed her a paper inside it, with some verses written on i
 
 “I remember. You told me about her before, you know.”
 
- “Psyche’s sighing all her prison darkens; 
- She is moaning for the far-off stars; 
- Fearing, hoping, every sound she hearkens⁠— 
- Fate may now be breaking at her bars. 
- Bound, fast bound, are Psyche’s airy pinions: 
- High her heart, her mourning soft and low⁠— 
- Knowing that in sultry pain’s dominions 
- Grow the palms that crown the victor’s brow; 
- That the empty hand the wreath encloses; 
- Earth’s cold winds but make the spirit brave; 
- Knowing that the briars bear the roses, 
- Golden flowers the waste deserted grave. 
- In the cypress-shade her myrtle groweth; 
- Much she loves, because she much hath borne; 
- Love-led, through the darksome way she goeth⁠— 
- On to meet him in the breaking morn. 
- She can bear⁠—” 
+ “Psyche’s sighing all her prison darkens;
+ She is moaning for the far-off stars;
+ Fearing, hoping, every sound she hearkens⁠—
+ Fate may now be breaking at her bars.
+ Bound, fast bound, are Psyche’s airy pinions:
+ High her heart, her mourning soft and low⁠—
+ Knowing that in sultry pain’s dominions
+ Grow the palms that crown the victor’s brow;
+ That the empty hand the wreath encloses;
+ Earth’s cold winds but make the spirit brave;
+ Knowing that the briars bear the roses,
+ Golden flowers the waste deserted grave.
+ In the cypress-shade her myrtle groweth;
+ Much she loves, because she much hath borne;
+ Love-led, through the darksome way she goeth⁠—
+ On to meet him in the breaking morn.
+ She can bear⁠—”
 
 “Here the translation ceases, you see; and then follows the date, with the words in German underneath it⁠—‘How weary I am!’ Now what is strange, Alice, is, that this date is the very month and year in which I was born.”
 
@@ -862,24 +862,24 @@ I lingered on the way. All the old places demanded my notice. They seemed to say
 
 My horse was an excellent walker, and I let him walk on, with the reins on his neck; while I, lost in a dream of the past, was singing a song of my own making, with which I often comforted my longing by giving it voice.
 
- The autumn winds are sighing 
- Over land and sea; 
- The autumn woods are dying 
- Over hill and lea; 
- And my heart is sighing, dying, 
- Maiden, for thee. 
- The autumn clouds are flying 
- Homeless over me; 
- The homeless birds are crying 
- In the naked tree; 
- And my heart is flying, crying, 
- Maiden, to thee. 
- My cries may turn to gladness, 
- And my flying flee; 
- My sighs may lose the sadness, 
- Yet sigh on in me; 
- All my sadness, all my gladness, 
- Maiden, lost in thee. 
+ The autumn winds are sighing
+ Over land and sea;
+ The autumn woods are dying
+ Over hill and lea;
+ And my heart is sighing, dying,
+ Maiden, for thee.
+ The autumn clouds are flying
+ Homeless over me;
+ The homeless birds are crying
+ In the naked tree;
+ And my heart is flying, crying,
+ Maiden, to thee.
+ My cries may turn to gladness,
+ And my flying flee;
+ My sighs may lose the sadness,
+ Yet sigh on in me;
+ All my sadness, all my gladness,
+ Maiden, lost in thee.
 
 I was roused by a heavy drop of rain upon my face. I looked up. A cool wave of wind flowed against me. Clouds had gathered; and over the peak of a hill to the left, the sky was very black. Old Constancy threw his head up, as if he wanted me to take the reins, and let him step out. I remembered that there used to be an awkward piece of road somewhere not far in front, where the path, with a bank on the left side, sloped to a deep descent on the right. If the road was as bad there as it used to be, it would be better to pass it before it grew quite dark. So I took the reins, and away went old Constancy. We had just reached the spot, when a keen flash of lightning broke from the cloud overhead, and my horse instantly stood stock-still, as if paralysed, with his nostrils turned up towards the peak of the mountain. I sat as still as he, to give him time to recover himself. But all at once, his whole frame was convulsed, as if by an agony of terror. He gave a great plunge, and then I felt his muscles swelling and knotting under me, as he rose on his hind legs, and went backwards, with the scaur behind him. I leaned forward on his neck to bring him down, but he reared higher and higher, till he stood bolt upright, and it was time to slip off, lest he should fall upon me. I did so; but my foot alighted upon no support. He had backed to the edge of the shelving ground, and I fell, and went to the bottom. The last thing I was aware of, was the thundering fall of my horse beside me.
 
@@ -1121,8 +1121,8 @@ I rose, and went to my own room. As I sat in dull misery by the fire, it struck 
 
 When he left me, I sat in a cold stupor, in which the thoughts⁠—if thoughts they could be called⁠—came and went of themselves. Overcome by the appearances of things⁠—as what man the strongest may not sometimes be?⁠—I felt as if I had lost her utterly, as if there was no Lady Alice anywhere, and as if, to add to the vacant horror of the world without her, a shadow of her, a goblin simulacrum, soulless, unreal, yet awfully like her, went wandering about the place which had once been glorified by her presence⁠—as to the eyes of seers the phantoms of events which have happened years before are still visible, clinging to the room in which they have indeed taken place. But, in a little while, something warm began to throb and flow in my being; and I thought that if she were dead, I should love her still; that now she was not worse than dead; it was only that her soul was out of sight. Who could tell but it might be wandering in worlds of too noble shapes and too high a speech, to permit of representation in the language of the world in which her bodily presentation remained, and therefore her speech and behaviour seemed to men to be mad? Nay, was it not in some sense better for me that it should be so? To see once the pictured likeness of her of whom I had no such memorial, would I not give years of my poverty-stricken life? And here was such a statue of her, as that of his wife which the widowed king was bending before, when he said:⁠—
 
- “What fine chisel 
- Could ever yet cut breath?” 
+ “What fine chisel
+ Could ever yet cut breath?”
 
 This statue I might see, “looking like an angel,” as the gardener had said. And, while the bond of visibility remained, must not the soul be, somehow, nearer to the earth, than if the form lay decaying beneath it? Was there not some possibility that the love for whose sake the reason had departed, might be able to recall that reason once more to the windows of sense⁠—make it look forth at those eyes, and lie listening in the recesses of those ears? In her somnambulic sleeps, the present body was the sign that the soul was within reach: so it might be still.
 
@@ -1344,14 +1344,14 @@ But this way of breaking into the house every night did not afford me the facili
 
 I waited till the usual time for her appearance had passed; and, always apprehensive now, as was very natural, I had begun to grow uneasy, when I heard her voice, as I had heard it once before, singing. Fearful of disturbing her, I listened for a moment. Whether the song was her own or not, I cannot be certain. When I questioned her afterwards, she knew nothing about it. It was this⁠—
 
- Days of old, 
- Ye are not dead, though gone from me; 
- Ye are not cold, 
- But like the summer-birds gone o’er the sea. 
- The sun brings back the swallows fast, 
- O’er the sea: 
- When thou comest at the last, 
- The days of old come back to me. 
+ Days of old,
+ Ye are not dead, though gone from me;
+ Ye are not cold,
+ But like the summer-birds gone o’er the sea.
+ The sun brings back the swallows fast,
+ O’er the sea:
+ When thou comest at the last,
+ The days of old come back to me.
 
 She ceased singing. Still she did not enter. I went into the closet, and found that the door was bolted. When I opened it, she entered, as usual; and, when she came to herself, seemed still better than before.
 
@@ -1504,9 +1504,9 @@ The volunteer-driven Standard Ebooks project relies on readers like you to submi
 
 Uncopyright
 
- May you do good and not evil. 
- May you find forgiveness for yourself and forgive others. 
- May you share freely, never taking more than you give. 
+ May you do good and not evil.
+ May you find forgiveness for yourself and forgive others.
+ May you share freely, never taking more than you give.
 
 Copyright pages exist to tell you that you can’t do something. Unlike them, this Uncopyright page exists to tell you that the writing and artwork in this ebook are believed to be in the United States public domain; that is, they are believed to be free of copyright restrictions in the United States. The United States public domain represents our collective cultural heritage, and items in it are free for anyone in the United States to do almost anything at all with, without having to get permission.
 

@@ -10,6 +10,9 @@
     "test:update": "UPDATE=1 node --test 'test/**/*.test.js'"
   },
   "private": true,
+  "dependencies": {
+    "fflate": "^0.8.2"
+  },
   "devDependencies": {
     "json-schema-to-typescript": "^15.0.4"
   }

@@ -17,15 +17,23 @@
   },
   {
     "startBlockIndex": 7,
-    "endBlockIndex": 16,
-    "leafBlockCount": 12,
+    "endBlockIndex": 10,
+    "leafBlockCount": 6,
     "outlinePath": "Main Title > Section Two > Subsection",
-    "text": "Deeper content.\nA quoted passage.\nHeader 1\nHeader 2\nCell 1\nCell 2\nNavigation Heading\nThis should be excluded from outline.\nSidebar Heading\nThis should also be excluded from outline.\nFooter Heading\nCode block\nwith preserved whitespace",
+    "text": "Deeper content.\nA quoted passage.\nHeader 1\nHeader 2\nCell 1\nCell 2",
     "pageRects": []
   },
   {
-    "startBlockIndex": 17,
-    "endBlockIndex": 24,
+    "startBlockIndex": 11,
+    "endBlockIndex": 13,
+    "leafBlockCount": 2,
+    "outlinePath": "Main Title > Navigation Heading",
+    "text": "This should be excluded from outline.\nCode block\nwith preserved whitespace",
+    "pageRects": []
+  },
+  {
+    "startBlockIndex": 14,
+    "endBlockIndex": 21,
     "leafBlockCount": 11,
     "outlinePath": "Main Title > NFC Stress Tests",
     "text": "Café lattés are nice.\nViet Nam: Hṍ Chí Minh\nKorean: 한글\nNormal text, café is NFC but café is NFD, then more normal.\nEspañol and Swedish: ångström\nÀB́ĈD̃Ë\nNFC: café\nNFD: café",

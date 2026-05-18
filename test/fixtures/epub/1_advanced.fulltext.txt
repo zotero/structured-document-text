@@ -30,8 +30,8 @@ This Gonzalo Hurtado de Mendoza married Juana Fernandez de Orozco, and was the f
 
 Pedro Gonzalez Hurtado de Mendoza married Aldonza, daughter of Fernan Perez de Ayala. He was with Juan I, of Castille, at the battle of Aljubarrota. In the flight the King’s horse was killed. Mendoza dismounted and said to the King:⁠—
 
- El cavallo vos han muerto,2 
- Subid Rey en mi cavallo. 
+ El cavallo vos han muerto,2
+ Subid Rey en mi cavallo.
 
 The King rode away. Mendoza was overtaken and slain. The date of the battle was August 14, 1385. His father survived him, dying in 1405.
 
@@ -41,32 +41,32 @@ Inigo Lopez Hurtado de Mendoza was born in 1396. He served with distinction at t
 
 Born in the Asturias, the Marquis was a poet. Among his writings was a little serranilla.
 
- Moza tan fermosa 
- No vi en la frontera 
- Como una vaquera 
- De la Finojosa. 
- En un verde prado 
- De rosas y flores 
- Guardando ganado 
- Con otros pastores, 
- La vi tan fermosa 
- Que apenas creyera 
- Que fuese vaquera 
- De la Finojosa. 
+ Moza tan fermosa
+ No vi en la frontera
+ Como una vaquera
+ De la Finojosa.
+ En un verde prado
+ De rosas y flores
+ Guardando ganado
+ Con otros pastores,
+ La vi tan fermosa
+ Que apenas creyera
+ Que fuese vaquera
+ De la Finojosa.
 
 Translation
- The sweetest girl without compare 
- In all my days I’ve ever seen 
- Was that young maid, so lithe and fair, 
- On Finojosa’s frontier green. 
- In pleasant shade of beech and pine 
- A verdant meadow did appear; 
- And here she watched the browsing kine 
- With other girls, but none like her. 
- By nature deck’d and well arrayed 
- She looked like some bright Summer Queen; 
- And not a common village maid 
- Of Finojosa’s frontier green. 
+ The sweetest girl without compare
+ In all my days I’ve ever seen
+ Was that young maid, so lithe and fair,
+ On Finojosa’s frontier green.
+ In pleasant shade of beech and pine
+ A verdant meadow did appear;
+ And here she watched the browsing kine
+ With other girls, but none like her.
+ By nature deck’d and well arrayed
+ She looked like some bright Summer Queen;
+ And not a common village maid
+ Of Finojosa’s frontier green.
 
 But the chief poetical work of the Marquis of Santillana was the Comedieta de Ponza, founded on the story of a great sea-fight, near the island of Ponza, in 1435, between the Aragon fleet and the Genoese. At the request of King Juan II he also made a collection of proverbs for his son Enrique IV. This was the earliest collection of proverbs made in modern times.
 
@@ -104,11 +104,11 @@ Don Bernardino de Mendoza, General of the galleys.
 Doña Maria de Mendoza, wife of the Count of Monteagudo.
 Doña Maria Pacheco, married to Don Juan de Padilla.
 
- Veinte y tres generaciones 
- La prosapia de Mendoza 
- No hay linage en toda España 
- De quien conozca 
- Tan notable antiguedad. 
+ Veinte y tres generaciones
+ La prosapia de Mendoza
+ No hay linage en toda España
+ De quien conozca
+ Tan notable antiguedad.
 Lope de Vega.
 
 Don Diego Hurtado de Mendoza, Author of Lazarillo de Tormes
@@ -181,7 +181,7 @@ His marriage brought him great advantages. Critics have called it disgraceful, b
 
 The work is the production of a genius. Its originality, and the admirable way in which the stories in it are told make it deserving of a wider audience, though of course it is well known to students of the literature of Europe. Seldom has so much wit, fun, and wisdom been gathered into so small a compass.
 
-     
+
 
 Prologue
 
@@ -443,9 +443,9 @@ Endnotes
 
 Doubt has been thrown on the authorship, but without sufficient reason. See Antonio, Bib. Nov. i. 291. ↩
 
- They have killed the horse of thine, 
- Save thy life and mount on mine. 
- ↩ 
+ They have killed the horse of thine,
+ Save thy life and mount on mine.
+ ↩
 
 History of Spanish Literature, i. 469⁠–⁠71. ↩
 
@@ -503,7 +503,7 @@ In 1525, at the time when Francis I arrived as a prisoner at Madrid, Charles hel
 
 List of Illustrations
 
- A map entitled “Sketch Map of the Route from Salamanca to Toledo.” The route highlighted is in southern Spain, and goes via Calvarasa, Albe de Tormes, Horcaja, Piedrahita, Navalacruz, S. Martin de Val de iglesia, Almorox, Escalona, Magueda, and Torrijos. 
+ A map entitled “Sketch Map of the Route from Salamanca to Toledo.” The route highlighted is in southern Spain, and goes via Calvarasa, Albe de Tormes, Horcaja, Piedrahita, Navalacruz, S. Martin de Val de iglesia, Almorox, Escalona, Magueda, and Torrijos.
 
 Colophon
 
@@ -547,9 +547,9 @@ The volunteer-driven Standard Ebooks project relies on readers like you to submi
 
 Uncopyright
 
- May you do good and not evil. 
- May you find forgiveness for yourself and forgive others. 
- May you share freely, never taking more than you give. 
+ May you do good and not evil.
+ May you find forgiveness for yourself and forgive others.
+ May you share freely, never taking more than you give.
 
 Copyright pages exist to tell you that you can’t do something. Unlike them, this Uncopyright page exists to tell you that the writing and artwork in this ebook are believed to be in the United States public domain; that is, they are believed to be free of copyright restrictions in the United States. The United States public domain represents our collective cultural heritage, and items in it are free for anyone in the United States to do almost anything at all with, without having to get permission.
 

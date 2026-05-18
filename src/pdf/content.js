@@ -1,5 +1,6 @@
 import { parseTextMap, buildRunData } from './decode.js';
 import { isWhitespaceChar } from './utils.js';
+import { makeContentRange } from '../range.js';
 
 function intersectRects(r1, r2) {
 	return !(
@@ -47,14 +48,13 @@ export function getRefRangesFromPageRects(structure, pageRects) {
 	const refRanges = [];
 
 	for (const [pageIndex, chunkRects] of pageRectsMap) {
-		const page = structure.pages?.[pageIndex];
+		const page = structure.catalog.pages?.[pageIndex];
 		if (!page || !Array.isArray(page.contentRanges)) continue;
 
 		for (const range of page.contentRanges) {
-			if (!range.start?.ref || !range.end?.ref) continue;
-
-			const startTopLevel = range.start.ref[0];
-			const endTopLevel = range.end.ref[0];
+			const startTopLevel = range?.[0]?.[0];
+			const endTopLevel = range?.[1]?.[0];
+			if (!Number.isInteger(startTopLevel) || !Number.isInteger(endTopLevel)) continue;
 
 			for (let i = startTopLevel; i <= endTopLevel; i++) {
 				const block = structure.content[i];
@@ -74,10 +74,7 @@ export function getRefRangesFromPageRects(structure, pageRects) {
 								const refKey = leafRef.join(',');
 								if (!refSet.has(refKey)) {
 									refSet.add(refKey);
-									refRanges.push({
-										start: { ref: leafRef },
-										end: { ref: leafRef }
-									});
+									refRanges.push(makeContentRange(leafRef, leafRef));
 								}
 								return;
 							}
@@ -100,8 +97,8 @@ export function getContent(structure, refRanges) {
 	const includedIndices = new Set();
 	if (Array.isArray(refRanges) && refRanges.length > 0) {
 		for (const range of refRanges) {
-			const startIdx = range?.start?.ref?.[0];
-			const endIdx = range?.end?.ref?.[0];
+			const startIdx = range?.[0]?.[0];
+			const endIdx = range?.[1]?.[0];
 			if (!Number.isInteger(startIdx) || !Number.isInteger(endIdx)) continue;
 			for (let i = startIdx; i <= endIdx; i++) {
 				includedIndices.add(i);

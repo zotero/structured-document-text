@@ -13,108 +13,108 @@
   },
   {
     "title": "2. Overview: Example Tracing Run",
-    "startRef": "35"
+    "startRef": "33"
   },
   {
     "title": "3. Trace Trees",
-    "startRef": "48",
+    "startRef": "49",
     "children": [
       {
         "title": "3.1 Traces",
-        "startRef": "50"
+        "startRef": "51"
       },
       {
         "title": "3.2 Trace Trees",
-        "startRef": "71"
+        "startRef": "72"
       },
       {
         "title": "3.3 Blacklisting",
-        "startRef": "87"
+        "startRef": "85"
       }
     ]
   },
   {
     "title": "4. Nested Trace Tree Formation",
-    "startRef": "95",
+    "startRef": "93",
     "children": [
       {
         "title": "4.1 Nesting Algorithm",
-        "startRef": "109"
+        "startRef": "105"
       },
       {
         "title": "4.2 Blacklisting with Nesting",
-        "startRef": "118"
+        "startRef": "114"
       }
     ]
   },
   {
     "title": "5. Trace Tree Optimization",
-    "startRef": "122",
+    "startRef": "118",
     "children": [
       {
         "title": "5.1 Optimizations",
-        "startRef": "124"
+        "startRef": "120"
       }
     ]
   },
   {
     "title": "6. Implementation",
-    "startRef": "140",
+    "startRef": "135",
     "children": [
       {
         "title": "6.1 Calling Compiled Traces",
-        "startRef": "146"
+        "startRef": "141"
       },
       {
         "title": "5.2 Register Allocation",
-        "startRef": "133"
+        "startRef": "129"
       },
       {
         "title": "6.2 Trace Stitching",
-        "startRef": "152"
+        "startRef": "147"
       },
       {
         "title": "6.3 Trace Recording",
-        "startRef": "157"
+        "startRef": "152"
       },
       {
         "title": "6.4 Preemption",
-        "startRef": "168"
+        "startRef": "163"
       },
       {
         "title": "6.5 Calling External Functions",
-        "startRef": "173"
+        "startRef": "167"
       }
     ]
   },
   {
     "title": "7. Evaluation",
-    "startRef": "189",
+    "startRef": "183",
     "children": [
       {
         "title": "6.6 Correctness",
-        "startRef": "184"
+        "startRef": "178"
       }
     ]
   },
   {
     "title": "8. Related Work",
-    "startRef": "210"
+    "startRef": "205"
   },
   {
     "title": "9. Conclusions",
-    "startRef": "223"
+    "startRef": "227"
   },
   {
     "title": "10. Future Work",
-    "startRef": "226"
+    "startRef": "230"
   },
   {
     "title": "Acknowledgments",
-    "startRef": "229"
+    "startRef": "233"
   },
   {
     "title": "References",
-    "startRef": "241"
+    "startRef": "236"
   }
 ]

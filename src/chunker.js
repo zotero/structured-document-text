@@ -64,7 +64,7 @@ export function getNextChunk(structure, startBlockIndex) {
 	}
 
 	// Flatten outline to get heading block indexes and their hierarchy paths
-	const headings = flattenOutline(structure.outline, []);
+	const headings = flattenOutline(structure.catalog.outline, []);
 	headings.sort((a, b) => a.blockIndex - b.blockIndex);
 
 	while (startBlockIndex < content.length) {

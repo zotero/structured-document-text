@@ -4,6 +4,7 @@
 
 import { parseTextMap, buildRunData } from './decode.js';
 import { isWhitespaceChar, sameRef } from './utils.js';
+import { makeContentRange } from '../range.js';
 
 function mapTextToRuns(text, runData) {
 	const rects = [];
@@ -249,7 +250,7 @@ export function getContentRangeFromBlocks(content, startOffset, endOffset) {
 	const startRef = firstLeafPath(content[safeStart], [safeStart]);
 	const endRef = lastLeafPath(content[safeEnd], [safeEnd]);
 
-	return { start: { ref: startRef }, end: { ref: endRef } };
+	return makeContentRange(startRef, endRef);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

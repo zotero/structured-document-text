@@ -18,8 +18,12 @@
         ]
       },
       {
+        "title": "Navigation Heading",
+        "startRef": "11"
+      },
+      {
         "title": "NFC Stress Tests",
-        "startRef": "17"
+        "startRef": "14"
       }
     ]
   }

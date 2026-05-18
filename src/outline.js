@@ -1,5 +1,5 @@
 export function exportOutline(structure) {
-	const outline = Array.isArray(structure?.outline) ? structure.outline : [];
+	const outline = Array.isArray(structure?.catalog?.outline) ? structure.catalog.outline : [];
 
 	function normalizeItem(item) {
 		if (!item || typeof item !== 'object') return null;

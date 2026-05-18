@@ -7,10 +7,8 @@
   "additionalProperties": false,
   "required": [
     "schemaVersion",
-    "processor",
-    "dateCreated",
-    "sourceContentType",
-    "sourceHash",
+    "metadata",
+    "catalog",
     "content"
   ],
   "properties": {
@@ -18,72 +16,95 @@
       "$ref": "#/$defs/SemVer",
       "description": "Semantic version of this schema (major/minor/patch)."
     },
-    "processor": {
+    "metadata": {
       "type": "object",
-      "description": "Processor that generated this document.",
+      "description": "Document-level extraction and source metadata.",
       "additionalProperties": false,
-      "required": ["type", "version"],
+      "required": ["processor", "dateCreated", "source"],
       "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["pdf", "epub", "snapshot"],
-          "description": "Processor type."
+        "processor": {
+          "type": "object",
+          "description": "Processor that generated this document.",
+          "additionalProperties": false,
+          "required": ["type", "version"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["pdf", "epub", "snapshot"],
+              "description": "Processor type."
+            },
+            "version": {
+              "$ref": "#/$defs/SemVer",
+              "description": "Processor version."
+            }
+          }
         },
-        "version": {
-          "$ref": "#/$defs/SemVer",
-          "description": "Processor version."
+        "dateCreated": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation time in ISO 8601."
+        },
+        "characterCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total character count of extracted text content (sum over all text nodes)."
+        },
+        "source": {
+          "type": "object",
+          "description": "Source document identity and source-specific properties.",
+          "additionalProperties": false,
+          "required": ["contentType", "hash"],
+          "properties": {
+            "contentType": {
+              "type": "string",
+              "enum": ["application/pdf", "application/epub+zip", "text/html", "application/xhtml+xml"],
+              "description": "MIME type of the source."
+            },
+            "hash": {
+              "type": "string",
+              "description": "MD5 hash of the source file (32-char hex string) used to detect changes.",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "fileSize": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Size of the original source file in bytes."
+            },
+            "properties": {
+              "type": "object",
+              "description": "Source-specific document properties. For PDF: PDFFormatVersion, Title, Author, Subject, Keywords, Creator, Producer, CreationDate, ModDate, Language, and any custom properties. For EPUB: dc:title, dc:creator, dc:language, etc. For snapshot: title, url, charset. Shape is open-ended.",
+              "additionalProperties": true
+            }
+          }
         }
       }
     },
-    "dateCreated": {
-      "type": "string",
-      "format": "date-time",
-      "description": "Creation time in ISO 8601."
-    },
-    "sourceContentType": {
-      "type": "string",
-      "enum": ["application/pdf", "application/epub+zip", "text/html", "application/xhtml+xml"],
-      "description": "MIME type of the source."
-    },
-    "sourceHash": {
-      "type": "string",
-      "description": "MD5 hash of the source file (32-char hex string) used to detect changes.",
-      "pattern": "^[0-9a-f]{32}$"
-    },
-    "fileSize": {
-      "type": "integer",
-      "minimum": 0,
-      "description": "Size of the original source file in bytes."
-    },
-    "characterCount": {
-      "type": "integer",
-      "minimum": 0,
-      "description": "Total character count of extracted text content (sum over all text nodes)."
-    },
-    "metadata": {
+    "catalog": {
       "type": "object",
-      "description": "Source-specific metadata. For PDF: PDFFormatVersion, Title, Author, Subject, Keywords, Creator, Producer, CreationDate, ModDate, Language, and any custom properties. For EPUB: dc:title, dc:creator, dc:language, etc. For snapshot: title, url, charset. Shape is open-ended.",
-      "additionalProperties": true
-    },
-    "outline": {
-      "type": "array",
-      "description": "Document outline (table of contents).",
-      "items": {
-        "$ref": "#/$defs/OutlineItem"
+      "description": "Document-level catalog structures that point into content.",
+      "additionalProperties": false,
+      "required": ["pages", "outline"],
+      "properties": {
+        "outline": {
+          "type": "array",
+          "description": "Document outline (table of contents).",
+          "items": {
+            "$ref": "#/$defs/OutlineItem"
+          }
+        },
+        "pages": {
+          "type": "array",
+          "description": "Per-page info. For PDF: physical pages. For EPUB: page mappings (physical page numbers or EPUB locations).",
+          "items": {
+            "$ref": "#/$defs/PageInfo"
+          }
+        },
+        "pageMappingType": {
+          "type": "string",
+          "enum": ["physical", "locations"],
+          "description": "For EPUB: whether pages represent physical page numbers from the source or synthetic EPUB locations."
+        }
       }
-    },
-    "pages": {
-      "type": "array",
-      "description": "Per-page info. For PDF: physical pages. For EPUB: page mappings (physical page numbers or EPUB locations).",
-      "minItems": 1,
-      "items": {
-        "$ref": "#/$defs/PageInfo"
-      }
-    },
-    "pageMappingType": {
-      "type": "string",
-      "enum": ["physical", "locations"],
-      "description": "For EPUB: whether pages represent physical page numbers from the source or synthetic EPUB locations."
     },
     "content": {
       "type": "array",
@@ -97,38 +118,40 @@
     {
       "if": {
         "properties": {
-          "sourceContentType": { "const": "application/pdf" }
+          "metadata": {
+            "properties": {
+              "source": {
+                "properties": {
+                  "contentType": { "const": "application/pdf" }
+                },
+                "required": ["contentType"]
+              }
+            },
+            "required": ["source"]
+          }
         },
-        "required": ["sourceContentType"]
+        "required": ["metadata"]
       },
       "then": {
-        "required": ["pages"],
         "properties": {
-          "pages": {
-            "items": {
-              "required": ["viewRect"]
+          "catalog": {
+            "properties": {
+              "pages": {
+                "items": {
+                  "required": ["viewRect"]
+                }
+              }
             }
           }
         }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "sourceContentType": { "const": "application/epub+zip" }
-        },
-        "required": ["sourceContentType"]
-      },
-      "then": {
-        "required": ["pages"]
       }
     }
   ],
   "$defs": {
     "SemVer": {
       "type": "string",
-      "description": "Semantic version string (major.minor.patch with optional pre-release and build metadata).",
-      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+      "description": "Version string in major.minor.patch form.",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
     },
     "RefsArray": {
       "description": "Referenced target nodes. Array because one mention can resolve to multiple targets (e.g. \"[2-5]\" -> multiple bibliography entries, or ambiguous author-name citations).",
@@ -823,41 +846,22 @@
         }
       }
     },
+    "PageContentPoint": {
+      "type": "array",
+      "description": "Path to a content node, with an optional terminal text offset when the referenced node is text.",
+      "minItems": 1,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
     "PageContentRange": {
-      "type": "object",
-      "description": "Logical content range on a page.",
-      "additionalProperties": false,
-      "required": ["start", "end"],
-      "properties": {
-        "start": {
-          "type": "object",
-          "required": ["ref"],
-          "additionalProperties": false,
-          "properties": {
-            "ref": {
-              "$ref": "#/$defs/RefPath"
-            },
-            "offset": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Character/code-unit offset within the node."
-            }
-          }
-        },
-        "end": {
-          "type": "object",
-          "required": ["ref"],
-          "additionalProperties": false,
-          "properties": {
-            "ref": {
-              "$ref": "#/$defs/RefPath"
-            },
-            "offset": {
-              "type": "integer",
-              "minimum": 0
-            }
-          }
-        }
+      "type": "array",
+      "description": "Logical content range on a page: [startPoint, endPoint]. Each point is a ref path with an optional terminal text offset.",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/PageContentPoint"
       }
     },
     "PageInfo": {

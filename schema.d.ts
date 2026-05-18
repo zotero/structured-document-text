@@ -14,58 +14,71 @@ export interface StructuredDocumentText {
    */
   schemaVersion: string;
   /**
-   * Processor that generated this document.
+   * Document-level extraction and source metadata.
    */
-  processor: {
+  metadata: {
     /**
-     * Processor type.
+     * Processor that generated this document.
      */
-    type: "pdf" | "epub" | "snapshot";
+    processor: {
+      /**
+       * Processor type.
+       */
+      type: "pdf" | "epub" | "snapshot";
+      /**
+       * Processor version.
+       */
+      version: string;
+    };
     /**
-     * Processor version.
+     * Creation time in ISO 8601.
      */
-    version: string;
+    dateCreated: string;
+    /**
+     * Total character count of extracted text content (sum over all text nodes).
+     */
+    characterCount?: number;
+    /**
+     * Source document identity and source-specific properties.
+     */
+    source: {
+      /**
+       * MIME type of the source.
+       */
+      contentType: "application/pdf" | "application/epub+zip" | "text/html" | "application/xhtml+xml";
+      /**
+       * MD5 hash of the source file (32-char hex string) used to detect changes.
+       */
+      hash: string;
+      /**
+       * Size of the original source file in bytes.
+       */
+      fileSize?: number;
+      /**
+       * Source-specific document properties. For PDF: PDFFormatVersion, Title, Author, Subject, Keywords, Creator, Producer, CreationDate, ModDate, Language, and any custom properties. For EPUB: dc:title, dc:creator, dc:language, etc. For snapshot: title, url, charset. Shape is open-ended.
+       */
+      properties?: {
+        [k: string]: unknown;
+      };
+    };
   };
   /**
-   * Creation time in ISO 8601.
+   * Document-level catalog structures that point into content.
    */
-  dateCreated: string;
-  /**
-   * MIME type of the source.
-   */
-  sourceContentType: "application/pdf" | "application/epub+zip" | "text/html" | "application/xhtml+xml";
-  /**
-   * MD5 hash of the source file (32-char hex string) used to detect changes.
-   */
-  sourceHash: string;
-  /**
-   * Size of the original source file in bytes.
-   */
-  fileSize?: number;
-  /**
-   * Total character count of extracted text content (sum over all text nodes).
-   */
-  characterCount?: number;
-  /**
-   * Source-specific metadata. For PDF: PDFFormatVersion, Title, Author, Subject, Keywords, Creator, Producer, CreationDate, ModDate, Language, and any custom properties. For EPUB: dc:title, dc:creator, dc:language, etc. For snapshot: title, url, charset. Shape is open-ended.
-   */
-  metadata?: {
-    [k: string]: unknown;
+  catalog: {
+    /**
+     * Document outline (table of contents).
+     */
+    outline: OutlineItem[];
+    /**
+     * Per-page info. For PDF: physical pages. For EPUB: page mappings (physical page numbers or EPUB locations).
+     */
+    pages: PageInfo[];
+    /**
+     * For EPUB: whether pages represent physical page numbers from the source or synthetic EPUB locations.
+     */
+    pageMappingType?: "physical" | "locations";
   };
-  /**
-   * Document outline (table of contents).
-   */
-  outline?: OutlineItem[];
-  /**
-   * Per-page info. For PDF: physical pages. For EPUB: page mappings (physical page numbers or EPUB locations).
-   *
-   * @minItems 1
-   */
-  pages?: [PageInfo, ...PageInfo[]];
-  /**
-   * For EPUB: whether pages represent physical page numbers from the source or synthetic EPUB locations.
-   */
-  pageMappingType?: "physical" | "locations";
   /**
    * Top-level block nodes (headings, paragraphs, lists, tables, etc.).
    */
@@ -99,6 +112,19 @@ export type Target = {
    */
   url?: string;
 };
+/**
+ * Logical content range on a page: [startPoint, endPoint]. Each point is a ref path with an optional terminal text offset.
+ *
+ * @minItems 2
+ * @maxItems 2
+ */
+export type PageContentRange = [PageContentPoint, PageContentPoint];
+/**
+ * Path to a content node, with an optional terminal text offset when the referenced node is text.
+ *
+ * @minItems 1
+ */
+export type PageContentPoint = [number, ...number[]];
 /**
  * Block nodes valid as document content, inside containers, and at top level. Excludes structural-only children (ListItemNode, TableRowNode, TableCellNode) that only appear inside their parent containers.
  */
@@ -199,22 +225,6 @@ export interface PageInfo {
    * Content ranges that appear on this page.
    */
   contentRanges?: PageContentRange[];
-}
-/**
- * Logical content range on a page.
- */
-export interface PageContentRange {
-  start: {
-    ref: RefPath;
-    /**
-     * Character/code-unit offset within the node.
-     */
-    offset?: number;
-  };
-  end: {
-    ref: RefPath;
-    offset?: number;
-  };
 }
 /**
  * Paragraph block (inline text only).

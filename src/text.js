@@ -4,6 +4,7 @@
 
 import { deepEqual } from './utils.js';
 import { mergeDeltaMaps } from './dom/deltamap.js';
+import { makeContentRange } from './range.js';
 
 function canMerge(a, b) {
 	let aAnc = a.anchor ?? null;
@@ -228,8 +229,8 @@ export function getContentRange(content, startOffset, endOffset) {
 	let safeStart = Math.max(0, Math.min(startOffset, maxIndex));
 	let safeEnd = Math.max(0, Math.min(endOffset, maxIndex));
 
-	return {
-		start: { ref: firstLeafPath(content[safeStart], [safeStart]) },
-		end: { ref: lastLeafPath(content[safeEnd], [safeEnd]) },
-	};
+	return makeContentRange(
+		firstLeafPath(content[safeStart], [safeStart]),
+		lastLeafPath(content[safeEnd], [safeEnd]),
+	);
 }

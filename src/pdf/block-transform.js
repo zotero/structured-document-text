@@ -12,6 +12,12 @@ import { parseTextMap, reconstructCharPositions } from './decode.js';
 import { canMergeTextNodes, mergeSequentialTextNodes } from './text-node.js';
 import { getBlockByRef, getContentRangeFromBlocks } from './block.js';
 import { isWhitespaceChar, sameRef } from './utils.js';
+import {
+	makeContentRange,
+	setContentRangeEnd,
+	setContentRangeStart,
+	splitContentRange,
+} from '../range.js';
 
 function mergePageRects(blocks) {
 	const allRects = [];
@@ -230,29 +236,32 @@ export function applyTextAttributes(structure, blockRef, offsetStart, offsetEnd,
 	};
 
 	const rangeUpdates = [];
-	if (Array.isArray(structure?.pages)) {
-		for (const page of structure.pages) {
+	if (Array.isArray(structure?.catalog?.pages)) {
+		for (const page of structure.catalog.pages) {
 			if (!page || !Array.isArray(page.contentRanges)) {
 				continue;
 			}
 			for (const range of page.contentRanges) {
-				if (range?.start?.ref && startsWithRef(range.start.ref, blockRef)) {
-					const absOffset = getAbsoluteOffsetForRef(block, blockRef, range.start.ref, range.start.offset, false);
+				const { start, end } = splitContentRange(range, structure.content);
+				if (start.ref && startsWithRef(start.ref, blockRef)) {
+					const absOffset = getAbsoluteOffsetForRef(block, blockRef, start.ref, start.offset, false);
 					if (absOffset !== null) {
 						rangeUpdates.push({
-							target: range.start,
+							range,
+							point: 'start',
 							absOffset,
-							hasOffset: Number.isInteger(range.start.offset)
+							hasOffset: Number.isInteger(start.offset)
 						});
 					}
 				}
-				if (range?.end?.ref && startsWithRef(range.end.ref, blockRef)) {
-					const absOffset = getAbsoluteOffsetForRef(block, blockRef, range.end.ref, range.end.offset, true);
+				if (end.ref && startsWithRef(end.ref, blockRef)) {
+					const absOffset = getAbsoluteOffsetForRef(block, blockRef, end.ref, end.offset, true);
 					if (absOffset !== null) {
 						rangeUpdates.push({
-							target: range.end,
+							range,
+							point: 'end',
 							absOffset,
-							hasOffset: Number.isInteger(range.end.offset)
+							hasOffset: Number.isInteger(end.offset)
 						});
 					}
 				}
@@ -414,9 +423,11 @@ export function applyTextAttributes(structure, blockRef, offsetStart, offsetEnd,
 			if (!mapped) {
 				continue;
 			}
-			update.target.ref = mapped.ref;
-			if (update.hasOffset) {
-				update.target.offset = mapped.offset;
+			if (update.point === 'start') {
+				setContentRangeStart(update.range, mapped.ref, update.hasOffset ? mapped.offset : undefined);
+			}
+			else {
+				setContentRangeEnd(update.range, mapped.ref, update.hasOffset ? mapped.offset : undefined);
 			}
 		}
 	}
@@ -437,6 +448,7 @@ export function pushArtifactsToTheEnd(structure) {
 	if (!Array.isArray(blocks) || blocks.length === 0) {
 		return structure;
 	}
+	const originalBlocks = [...blocks];
 
 	const nonArtifacts = [];
 	const artifacts = [];
@@ -521,8 +533,8 @@ export function pushArtifactsToTheEnd(structure) {
 
 	const copyRef = (ref) => (Array.isArray(ref) ? [...ref] : null);
 
-	if (structure && Array.isArray(structure.pages)) {
-		for (const page of structure.pages) {
+	if (structure && Array.isArray(structure.catalog.pages)) {
+		for (const page of structure.catalog.pages) {
 			if (!page || !Array.isArray(page.contentRanges)) {
 				continue;
 			}
@@ -530,19 +542,22 @@ export function pushArtifactsToTheEnd(structure) {
 			const updatedRanges = [];
 
 			for (const range of page.contentRanges) {
-				const startRef = range && range.start ? range.start.ref : null;
-				const endRef = range && range.end ? range.end.ref : null;
+				const { start, end } = splitContentRange(range, originalBlocks);
+				const startRef = start.ref;
+				const endRef = end.ref;
 				const startIndex = Array.isArray(startRef) ? startRef[0] : null;
 				const endIndex = Array.isArray(endRef) ? endRef[0] : null;
 
 				if (!Number.isInteger(startIndex) || !Number.isInteger(endIndex) || startIndex > endIndex) {
-					if (range && range.start) {
-						updateRefPath(range.start.ref);
+					if (startRef) {
+						updateRefPath(startRef);
 					}
-					if (range && range.end) {
-						updateRefPath(range.end.ref);
+					if (endRef) {
+						updateRefPath(endRef);
 					}
-					updatedRanges.push(range);
+					if (Array.isArray(startRef) && Array.isArray(endRef)) {
+						updatedRanges.push(makeContentRange(startRef, endRef, start.offset, end.offset));
+					}
 					continue;
 				}
 
@@ -551,7 +566,9 @@ export function pushArtifactsToTheEnd(structure) {
 					expanded.push({
 						oldIndex: i,
 						startRef: i === startIndex ? startRef : null,
-						endRef: i === endIndex ? endRef : null
+						endRef: i === endIndex ? endRef : null,
+						startOffset: i === startIndex ? start.offset : undefined,
+						endOffset: i === endIndex ? end.offset : undefined
 					});
 				}
 
@@ -569,9 +586,10 @@ export function pushArtifactsToTheEnd(structure) {
 						const startNewIndex = indexMap.get(first.oldIndex);
 						const endNewIndex = indexMap.get(last.oldIndex);
 						const autoRange = getContentRangeFromBlocks(blocks, startNewIndex, endNewIndex);
+						const autoRangeParts = splitContentRange(autoRange, blocks);
 
-						let rangeStartRef = first.startRef ? copyRef(first.startRef) : autoRange.start.ref;
-						let rangeEndRef = last.endRef ? copyRef(last.endRef) : autoRange.end.ref;
+						let rangeStartRef = first.startRef ? copyRef(first.startRef) : autoRangeParts.start.ref;
+						let rangeEndRef = last.endRef ? copyRef(last.endRef) : autoRangeParts.end.ref;
 
 						if (Array.isArray(rangeStartRef) && Number.isInteger(startNewIndex)) {
 							rangeStartRef[0] = startNewIndex;
@@ -580,14 +598,14 @@ export function pushArtifactsToTheEnd(structure) {
 							rangeEndRef[0] = endNewIndex;
 						}
 
-						updatedRanges.push({
-							start: {
-								ref: rangeStartRef
-							},
-							end: {
-								ref: rangeEndRef
-							}
-						});
+						if (Array.isArray(rangeStartRef) && Array.isArray(rangeEndRef)) {
+							updatedRanges.push(makeContentRange(
+								rangeStartRef,
+								rangeEndRef,
+								first.startOffset,
+								last.endOffset,
+							));
+						}
 
 						runStart = i;
 					}
@@ -972,8 +990,8 @@ export function mergeBlocks(structure, blockIndexes) {
 		updateNodeRefs(block);
 	}
 
-	if (Array.isArray(structure.pages)) {
-		for (const page of structure.pages) {
+	if (Array.isArray(structure.catalog.pages)) {
+		for (const page of structure.catalog.pages) {
 			if (!page || !Array.isArray(page.contentRanges)) {
 				continue;
 			}
@@ -981,27 +999,26 @@ export function mergeBlocks(structure, blockIndexes) {
 			const updatedRanges = [];
 
 			for (const range of page.contentRanges) {
-				const startRef = range && range.start ? range.start.ref : null;
-				const endRef = range && range.end ? range.end.ref : null;
+				const { start, end } = splitContentRange(range, originalContent);
+				const startRef = start.ref;
+				const endRef = end.ref;
 				const startIndex = Array.isArray(startRef) ? startRef[0] : null;
 				const endIndex = Array.isArray(endRef) ? endRef[0] : null;
 
 				if (!Number.isInteger(startIndex) || !Number.isInteger(endIndex) || startIndex > endIndex) {
-					if (range && range.start) {
-						const mappedOffset = mapOffset(range.start.ref, range.start.offset, false);
-						updateRefPath(range.start.ref);
-						if (Number.isInteger(mappedOffset)) {
-							range.start.offset = mappedOffset;
-						}
+					let startOffset = undefined;
+					let endOffset = undefined;
+					if (startRef) {
+						startOffset = mapOffset(startRef, start.offset, false);
+						updateRefPath(startRef);
 					}
-					if (range && range.end) {
-						const mappedOffset = mapOffset(range.end.ref, range.end.offset, true);
-						updateRefPath(range.end.ref);
-						if (Number.isInteger(mappedOffset)) {
-							range.end.offset = mappedOffset;
-						}
+					if (endRef) {
+						endOffset = mapOffset(endRef, end.offset, true);
+						updateRefPath(endRef);
 					}
-					updatedRanges.push(range);
+					if (Array.isArray(startRef) && Array.isArray(endRef)) {
+						updatedRanges.push(makeContentRange(startRef, endRef, startOffset, endOffset));
+					}
 					continue;
 				}
 
@@ -1018,7 +1035,9 @@ export function mergeBlocks(structure, blockIndexes) {
 						startRef: mappedStart ?? segment?.startRef ?? null,
 						endRef: mappedEnd ?? segment?.endRef ?? null,
 						oldStartRef,
-						oldEndRef
+						oldEndRef,
+						startOffset: i === startIndex ? start.offset : undefined,
+						endOffset: i === endIndex ? end.offset : undefined
 					});
 				}
 
@@ -1037,12 +1056,18 @@ export function mergeBlocks(structure, blockIndexes) {
 						const startNewIndex = indexMap.get(first.oldIndex);
 						const endNewIndex = indexMap.get(last.oldIndex);
 
-						const autoRange = (Number.isInteger(startNewIndex) && Number.isInteger(endNewIndex))
-							? getContentRangeFromBlocks(structure.content, startNewIndex, endNewIndex)
-							: { start: { ref: null }, end: { ref: null } };
+						const autoRangeParts = Number.isInteger(startNewIndex) && Number.isInteger(endNewIndex)
+							? splitContentRange(
+								getContentRangeFromBlocks(structure.content, startNewIndex, endNewIndex),
+								structure.content
+							)
+							: {
+								start: { ref: null, offset: undefined },
+								end: { ref: null, offset: undefined },
+							};
 
-						let rangeStartRef = first.startRef ? [...first.startRef] : autoRange.start.ref;
-						let rangeEndRef = last.endRef ? [...last.endRef] : autoRange.end.ref;
+						let rangeStartRef = first.startRef ? [...first.startRef] : autoRangeParts.start.ref;
+						let rangeEndRef = last.endRef ? [...last.endRef] : autoRangeParts.end.ref;
 
 						if (Array.isArray(rangeStartRef) && Number.isInteger(startNewIndex)) {
 							rangeStartRef[0] = startNewIndex;
@@ -1053,25 +1078,23 @@ export function mergeBlocks(structure, blockIndexes) {
 
 						const startOffset = mapOffset(
 							first.oldStartRef,
-							first.oldIndex === startIndex ? range?.start?.offset : null,
+							first.oldIndex === startIndex ? first.startOffset : null,
 							false
 						);
 						const endOffset = mapOffset(
 							last.oldEndRef,
-							last.oldIndex === endIndex ? range?.end?.offset : null,
+							last.oldIndex === endIndex ? last.endOffset : null,
 							true
 						);
 
-						updatedRanges.push({
-							start: {
-								ref: rangeStartRef,
-								...(Number.isInteger(startOffset) ? { offset: startOffset } : {})
-							},
-							end: {
-								ref: rangeEndRef,
-								...(Number.isInteger(endOffset) ? { offset: endOffset } : {})
-							}
-						});
+						if (Array.isArray(rangeStartRef) && Array.isArray(rangeEndRef)) {
+							updatedRanges.push(makeContentRange(
+								rangeStartRef,
+								rangeEndRef,
+								startOffset,
+								endOffset,
+							));
+						}
 
 						runStart = i;
 					}

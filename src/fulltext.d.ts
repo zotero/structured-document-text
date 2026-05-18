@@ -1,3 +1,10 @@
-import type { StructuredDocumentText } from '../../schema';
+import type { ContentBlockNode, PageInfo } from '../../schema';
 
-export function getFulltextFromStructuredText(structure: StructuredDocumentText, pageIndexes: number[]): string;
+export interface FulltextStructuredDocumentText {
+	catalog: {
+		pages: PageInfo[];
+	};
+	content: ContentBlockNode[];
+}
+
+export function getFulltextFromStructuredText(structure: FulltextStructuredDocumentText, pageIndexes: number[]): string;
