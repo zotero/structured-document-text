@@ -3,6 +3,7 @@
  */
 
 import { deepEqual } from '../utils.js';
+import { stringifyTextMap } from './text-map.js';
 
 /**
  * Check if two text nodes can be merged (same style, refs, target).
@@ -56,7 +57,7 @@ export function mergeSequentialTextNodes(content) {
 			const anchor = current.anchor && typeof current.anchor === 'object'
 				? { ...current.anchor }
 				: {};
-			anchor.textMap = JSON.stringify(currentRuns);
+			anchor.textMap = stringifyTextMap(currentRuns);
 			current.anchor = anchor;
 		}
 		merged.push(current);

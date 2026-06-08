@@ -1,10 +1,18 @@
 Trace-based Just-in-Time Type Specialization for Dynamic Languages
 
-Andreas Gal∗+, Brendan Eich∗, Mike Shaver∗, David Anderson∗, David Mandelin∗, Mohammad R. Haghighat$, Blake Kaplan∗, Graydon Hoare∗, Boris Zbarsky∗, Jason Orendorff∗, Jesse Ruderman∗, Edwin Smith#, Rick Reitmaier#, Michael Bebenita+, Mason Chang+#, Michael Franz+ Mozilla Corporation∗
+Andreas Gal∗+, Brendan Eich∗, Mike Shaver∗, David Anderson∗, David Mandelin∗, Mohammad R. Haghighat$, Blake Kaplan∗, Graydon Hoare∗, Boris Zbarsky∗, Jason Orendorff∗,
 
-{gal,brendan,shaver,danderson,dmandelin,mrbkap,graydon,bz,jorendorff,jruderman}@mozilla.com Adobe Corporation#
+Jesse Ruderman∗, Edwin Smith#, Rick Reitmaier#, Michael Bebenita+, Mason Chang+#, Michael Franz+
 
-{edwsmith,rreitmai}@adobe.com Intel Corporation$
+Mozilla Corporation∗
+
+{gal,brendan,shaver,danderson,dmandelin,mrbkap,graydon,bz,jorendorff,jruderman}@mozilla.com
+
+Adobe Corporation#
+
+{edwsmith,rreitmai}@adobe.com
+
+Intel Corporation$
 
 {mohammad.r.haghighat}@intel.com
 
@@ -24,11 +32,9 @@ Keywords JavaScript, just-in-time compilation, trace trees.
 
 1. Introduction
 
-Dynamic languages such as JavaScript, Python, and Ruby, are popular since they are expressive, accessible to non-experts, and make deployment as easy as distributing a source file. They are used for small scripts as well as for complex applications. JavaScript, for example, is the de facto standard for client-side web programmingand is used for the application logic of browser-based productivity applications such as Google Mail, Google Docs and Zimbra Collaboration Suite. In this domain, in order to provide a fluid user experience and enable a new generation of applications, virtual machines must provide a low startup time and high performance.
+Dynamic languages such as JavaScript, Python, and Ruby, are popular since they are expressive, accessible to non-experts, and make deployment as easy as distributing a source file. They are used for small scripts as well as for complex applications. JavaScript, for example, is the de facto standard for client-side web programming and is used for the application logic of browser-based productivity applications such as Google Mail, Google Docs and Zimbra Collaboration Suite. In this domain, in order to provide a fluid user experience and enable a new generation of applications, virtual machines must provide a low startup time and high performance.
 
 Permission to make digital or hard copies of all or part of this work for personal or classroom use is granted without fee provided that copies are not made or distributed for profit or commercial advantage and that copies bear this notice and the full citation on the first page. To copy otherwise, to republish, to post on servers or to redistribute to lists, requires prior specific permission and/or a fee.
-
-PLDI’09, June 15–20, 2009, Dublin, Ireland.
 
 Compilers for statically typed languages rely on type information to generate efficient machine code. In a dynamically typed programming language such as JavaScript, the types of expressions may vary at runtime. This means that the compiler can no longer easily transform operations into machine instructions that operate on one specific type. Without exact type information, the compiler must emit slower generalized machine code that can deal with all potential type combinations. While compile-time static type inference might be able to gather type information to generate optimized machine code, traditional static analysis is very expensive and hence not well suited for the highly interactive environment of a web browser.
 
@@ -56,7 +62,7 @@ This paper makes the following contributions:
 • We explain how to speculatively generate efficient type-specialized code for traces from dynamic language programs.
 • We validate our tracing techniques in an implementation based on the SpiderMonkey JavaScript interpreter, achieving 2x-20x speedups on many programs.
 
-The remainder of this paper is organized as follows. Section 3 is a general overview of trace tree based compilation we use to capture and compile frequently executed code regions. In Section 4 we describe our approach of covering nested loops using a number of individual trace trees. In Section 5 we describe our tracecompilation based speculative type specialization approach we use to generate efficient machine code from recorded bytecode traces. Our implementation of a dynamic type-specializing compiler for JavaScript is described in Section 6. Related work is discussed in Section 8. In Section 7 we evaluate our dynamic compiler based ona set of industry benchmarks. The paper ends with conclusions in Section 9 and an outlook on future work is presented in Section 10.
+The remainder of this paper is organized as follows. Section 3 is a general overview of trace tree based compilation we use to capture and compile frequently executed code regions. In Section 4 we describe our approach of covering nested loops using a number of individual trace trees. In Section 5 we describe our tracecompilation based speculative type specialization approach we use to generate efficient machine code from recorded bytecode traces. Our implementation of a dynamic type-specializing compiler for JavaScript is described in Section 6. Related work is discussed in Section 8. In Section 7 we evaluate our dynamic compiler based on a set of industry benchmarks. The paper ends with conclusions in Section 9 and an outlook on future work is presented in Section 10.
 
 1 for (var i = 2; i < 100; ++i) {
 2   if (!primes[i])
@@ -124,14 +130,12 @@ i=2. This is the first iteration of the outer loop. The loop on lines 4-5 become
 
 TraceMonkey stops recording when execution returns to the loop header or exits the loop. In this case, execution returns to the loop header on line 4.
 
-After recording is finished, TraceMonkey compiles the trace to native code using the recorded type information for optimization. The result is a native code fragment that can be entered if theinterpreter PC and the types of values match those observed when trace recording was started. The first trace in our example, T45, covers lines 4 and 5. This trace can be entered if the PC is at line 4, i and k are integers, and primes is an object. After compiling T45, TraceMonkey returns to the interpreter and loops back to line 1.
+After recording is finished, TraceMonkey compiles the trace to native code using the recorded type information for optimization. The result is a native code fragment that can be entered if the interpreter PC and the types of values match those observed when trace recording was started. The first trace in our example, T45, covers lines 4 and 5. This trace can be entered if the PC is at line 4, i and k are integers, and primes is an object. After compiling T45, TraceMonkey returns to the interpreter and loops back to line 1.
 
 i=3. Now the loop header at line 1 has become hot, so TraceMonkey starts recording. When recording reaches line 4, TraceMonkey observes that it has reached an inner loop header that already has a compiled trace, so TraceMonkey attempts to nest the inner loop inside the current trace. The first step is to call the inner trace as a subroutine. This executes the loop on line 4 to completion and then returns to the recorder. TraceMonkey verifies that the call was successful and then records the call to the inner trace as part of the current trace. Recording continues until execution reaches line 1, and at which point TraceMonkey finishes and compiles a trace for the outer loop, T16.
 
 i=4. On this iteration, TraceMonkey calls T16. Because i=4, the if statement on line 2 is taken. This branch was not taken in the original trace, so this causes T16 to fail a guard and take a side exit. The exit is not yet hot, so TraceMonkey returns to the interpreter, which executes the continue statement.
-
 i=5. TraceMonkey calls T16, which in turn calls the nested trace T45. T16 loops back to its own header, starting the next iteration without ever returning to the monitor.
-
 i=6. On this iteration, the side exit on line 2 is taken again. This time, the side exit becomes hot, so a trace T23,1 is recorded that covers line 3 and returns to the loop header. Thus, the end of T23,1 jumps directly to the start of T16. The side exit is patched so that on future iterations, it jumps directly to T23,1.
 
 At this point, TraceMonkey has compiled enough traces to cover the entire nested loop structure, so the rest of the program runs entirely as native code.
@@ -168,9 +172,7 @@ All LIR primitives apply to operands of specific types. Thus, LIR traces are nec
 
 A potential problem is that some operations can produce values of unpredictable types. For example, reading a property from an object could yield a value of any type, not necessarily the type observed during recording. The recorder emits guard instructions that conditionally exit if the operation yields a value of a different type from that seen during recording. These guard instructions guarantee that as long as execution is on trace, the types of values match those of the typed trace. When the VM observes a side exit along such a type guard, a new typed trace is recorded originating at the side exit location, capturing the new type of the operation in question.
 
-Representation specialization: objects. In JavaScript, name lookup semantics are complex and potentially expensive because they include features like object inheritance and eval. To evaluate an object property read expression like o.x, the interpreter must search the property map of o and all of its prototypes and parents. Property maps can be implemented with different data structures (e.g., per-object hash tables or shared hash tables), so the search process also must dispatch on the representation of each object found during search. TraceMonkey can simply observe the result of the search process and record the simplest possible LIR to access the property value. For example, the search might finds the value of o.x in the prototype of o, which uses a shared hash-table representation that places x in slot 2 of a property vector. Then the recorded can generate LIR that reads o.x with just two or three loads: one to get the prototype, possibly one to get the property value vector, and one more to get slot 2 from the vector. This is a vast simplification and speedup compared to the original interpreter code. Inheritance relationships and object representations can change during execution, so the simplified code requires guard instructions that ensure the object representation is the same. In TraceMonkey, objects’ rep-
-
-resentations are assigned an integer key called the object shape. Thus, the guard is a simple equality check on the object shape.
+Representation specialization: objects. In JavaScript, name lookup semantics are complex and potentially expensive because they include features like object inheritance and eval. To evaluate an object property read expression like o.x, the interpreter must search the property map of o and all of its prototypes and parents. Property maps can be implemented with different data structures (e.g., per-object hash tables or shared hash tables), so the search process also must dispatch on the representation of each object found during search. TraceMonkey can simply observe the result of the search process and record the simplest possible LIR to access the property value. For example, the search might finds the value of o.x in the prototype of o, which uses a shared hash-table representation that places x in slot 2 of a property vector. Then the recorded can generate LIR that reads o.x with just two or three loads: one to get the prototype, possibly one to get the property value vector, and one more to get slot 2 from the vector. This is a vast simplification and speedup compared to the original interpreter code. Inheritance relationships and object representations can change during execution, so the simplified code requires guard instructions that ensure the object representation is the same. In TraceMonkey, objects’ representations are assigned an integer key called the object shape. Thus, the guard is a simple equality check on the object shape.
 
 Representation specialization: numbers. JavaScript has no integer type, only a Number type that is the set of 64-bit IEEE754 floating-pointer numbers (“doubles”). But many JavaScript operators, in particular array accesses and bitwise operators, really operate on integers, so they first convert the number to an integer, and then convert any integer result back to a double.1 Clearly, a JavaScript VM that wants to be fast must find a way to operate on integers directly and avoid these conversions.
 
@@ -228,7 +230,7 @@ In this case, the VM will repeatedly pass the loop header, search for a trace, f
 
 4. Nested Trace Tree Formation
 
-Figure 7 shows basic trace tree compilation (11) applied to a nested loop where the inner loop contains two paths. Usually, the inner loop (with header at i2) becomes hot first, and a trace tree is rooted at that point. For example, the first recorded trace may be a cyclethrough the inner loop, {i2, i3, i5, α}. The α symbol is used to indicate that the trace loops back the tree anchor.
+Figure 7 shows basic trace tree compilation (11) applied to a nested loop where the inner loop contains two paths. Usually, the inner loop (with header at i2) becomes hot first, and a trace tree is rooted at that point. For example, the first recorded trace may be a cycle through the inner loop, {i2, i3, i5, α}. The α symbol is used to indicate that the trace loops back the tree anchor.
 
 T Trunk Trace Tree Anchor Trace Anchor Branch Trace Guard Side Exit
 
@@ -242,7 +244,9 @@ When execution leaves the inner loop, the basic design has two choices. First, t
 
 For example, the program might exit at i5 and record a branch trace that incorporates the outer loop: {i5, i7, i1, i6, i7, i1, α}. Later, the program might take the other branch at i2 and then exit, recording another branch trace incorporating the outer loop: {i2, i4, i5, i7, i1, i6, i7, i1, α}. Thus, the outer loop is recorded and compiled twice, and both copies must be retained in the trace cache.
 
-i2 i3 i4 i5 i1 i6 i7 t1 t2 Tree Call Outer Tree Nested Tree Exit Guard (a) (b)
+i2 i3 i4 i5 i1 i6 i7 t1 t2 Tree Call Outer Tree Nested Tree Exit Guard
+
+(a) (b)
 
 Figure 7. Control flow graph of a nested loop with an if statement inside the inner most loop (a). An inner tree captures the inner loop, and is nested inside an outer tree which “calls” the inner tree. The inner tree returns to the outer tree once it exits along its loop condition guard (b).
 
@@ -259,7 +263,7 @@ The algorithm for building nested trace trees is as follows. We start tracing at
 • If LO has a type-matching compiled trace tree, we call LO as a nested trace tree. If the call succeeds, then we record the call in the trace for LR. On future executions, the trace for LR will call the inner trace directly.
 • If LO does not have a type-matching compiled trace tree yet, we have to obtain it before we are able to proceed. In order to do this, we simply abort recording the first trace. The trace monitor will see the inner loop header, and will immediately start recording the inner loop. 2
 
-If all the loops in a nest are type-stable, then loop nesting creates no duplication. Otherwise, if loops are nested to a depth k, and eachloop is entered with m different type maps (on geometric average), then we compile O(mk) copies of the innermost loop. As long as m is close to 1, the resulting trace trees will be tractable.
+If all the loops in a nest are type-stable, then loop nesting creates no duplication. Otherwise, if loops are nested to a depth k, and each loop is entered with m different type maps (on geometric average), then we compile O(mk) copies of the innermost loop. As long as m is close to 1, the resulting trace trees will be tractable.
 
 2 Instead of aborting the outer recording, we could principally merely suspend the recording, but that would require the implementation to be able to record several traces simultaneously, complicating the implementation, while saving only a few iterations in the interpreter.
 
@@ -308,11 +312,15 @@ After a LIR instruction is successfully read (“pulled”) from the backward fi
 
 We use a simple greedy register allocator that makes a single backward pass over the trace (it is integrated with the code generator). By the time the allocator has reached an instruction like v3 = add v1, v2, it has already assigned a register to v3. If v1 and v2 have not yet been assigned registers, the allocator assigns a free register to each. If there are no free registers, a value is selected for spilling. We use a class heuristic that selects the “oldest” registercarried value (6).
 
-The heuristic considers the set R of values v in registers immediately after the current instruction for spilling. Let vm be the last instruction before the current where each v is referred to. Then theheuristic selects v with minimum vm. The motivation is that this frees up a register for as long as possible given a single spill.
+The heuristic considers the set R of values v in registers immediately after the current instruction for spilling. Let vm be the last instruction before the current where each v is referred to. Then the
 
 Tag JS Type Description xx1 number 31-bit integer representation 000 object pointer to JSObject handle 010 number pointer to double handle 100 string pointer to JSString handle 110 boolean enumeration for null, undefined, true, false null, or undefined
 
-Figure 9. Tagged values in the SpiderMonkey JS interpreter. Testing tags, unboxing (extracting the untagged value) and boxing (creating tagged values) are significant costs. Avoiding these costs is a key benefit of tracing.
+Figure 9. Tagged values in the SpiderMonkey JS interpreter.
+
+Testing tags, unboxing (extracting the untagged value) and boxing (creating tagged values) are significant costs. Avoiding these costs is a key benefit of tracing.
+
+heuristic selects v with minimum vm. The motivation is that this frees up a register for as long as possible given a single spill.
 
 If we need to spill a value vs at this point, we generate the restore code just after the code for the current instruction. The corresponding spill code is generated just after the last point where vs was used. The register that was assigned to vs is marked free for the preceding code, because that register can now be used freely without affecting the following code
 
@@ -359,17 +367,13 @@ In our implementation, the only direct modification to the interpreter is a call
 Recording is activated by a pointer swap that sets the interpreter’s dispatch table to call a single “interrupt” routine for every bytecode. The interrupt routine first calls a bytecode-specific recording routine. Then, it turns off recording if necessary (e.g., the trace ended). Finally, it jumps to the standard interpreter bytecode implementation. Some bytecodes have effects on the type map that cannot be predicted before executing the bytecode (e.g., calling String.charCodeAt, which returns an integer or NaN if the index argument is out of range). For these, we arrange for the interpreter to call into the recorder again after executing the bytecode. Since such hooks are relatively rare, we embed them directly into the interpreter, with an additional runtime check to see whether a recorder is currently active.
 
 While separating the interpreter from the recorder reduces individual code complexity, it also requires careful implementation and extensive testing to achieve semantic equivalence.
-
 In some cases achieving this equivalence is difficult since SpiderMonkey follows a fat-bytecode design, which was found to be beneficial to pure interpreter performance.
-
 In fat-bytecode designs, individual bytecodes can implement complex processing (e.g., the getprop bytecode, which implements full JavaScript property value access, including special cases for cached and dense array access).
-
 Fat bytecodes have two advantages: fewer bytecodes means lower dispatch cost, and bigger bytecode implementations give the compiler more opportunities to optimize the interpreter.
 
 Fat bytecodes are a problem for TraceMonkey because they require the recorder to reimplement the same special case logic in the same way. Also, the advantages are reduced because (a) dispatch costs are eliminated entirely in compiled traces, (b) the traces contain only one special case, not the interpreter’s large chunk of code, and (c) TraceMonkey spends less time running the base interpreter.
 
 One way we have mitigated these problems is by implementing certain complex bytecodes in the recorder as sequences of simple bytecodes. Expressing the original semantics this way is not too difficult, and recording simple bytecodes is much easier. This enables us to retain the advantages of fat bytecodes while avoiding some of their problems for trace recording. This is particularly effective for fat bytecodes that recurse back into the interpreter, for example to convert an object into a primitive value by invoking a well-known method on the object, since it lets us inline this function call.
-
 It is important to note that we split fat opcodes into thinner opcodes only during recording. When running purely interpretatively (i.e. code that has been blacklisted), the interpreter directly and efficiently executes the fat opcodes.
 
 6.4 Preemption
@@ -406,7 +410,7 @@ Currently, we do not support calling native property get and set override functi
 
 During development, we had access to existing JavaScript test suites, but most of them were not designed with tracing VMs in mind and contained few loops.
 
-One tool that helped us greatly was Mozilla’s JavaScript fuzz tester, JSFUNFUZZ, which generates random JavaScript programs by nesting random language elements. We modified JSFUNFUZZ to generate loops, and also to test more heavily certain constructs we suspected would reveal flaws in our implementation. For example, we suspected bugs in TraceMonkey’s handling of type-unstableloops and heavily branching code, and a specialized fuzz tester indeed revealed several regressions which we subsequently corrected.
+One tool that helped us greatly was Mozilla’s JavaScript fuzz tester, JSFUNFUZZ, which generates random JavaScript programs by nesting random language elements. We modified JSFUNFUZZ to generate loops, and also to test more heavily certain constructs we suspected would reveal flaws in our implementation. For example, we suspected bugs in TraceMonkey’s handling of type-unstable loops and heavily branching code, and a specialized fuzz tester indeed revealed several regressions which we subsequently corrected.
 
 !"# $!"# %!"# &!"# '!"# (!"# )!"# *!"# +!"# ,!"# $!!"# &-./012#3%4%56# &-.789:;#3%4,56# &-.9<=>9</2#3$4%56# <//2??.1@A<9=.>922?#3!4,56# <//2??.B<AAC0/;#3%4%56# <//2??.A18-=#3'4%56# <//2??.A?@2D2#3&4!56# 1@>8:?.&1@>.1@>?.@A.1=>2#3%(4(56# 1@>8:?.1@>?.@A.1=>2#3+4*56# 1@>8:?.1@>E@?2.<A-#3%(4%56# 1@>8:?.A?@2D2.1@>?#3%4*56# /8A>98FG8E.92/09?@D2#3$4!56# /9=:>8.<2?#3$4)56# /9=:>8.7-(#3%4&56# /9=:>8.?;<$#3(4,56# -<>2.B897<>.>8H2#3$4$56# -<>2.B897<>.5:<91#3$4!56# 7<>;./89-@/#3'4,56# 7<>;.:<9I<F.?07?#3(4,56# 7<>;.?:2/>9<F.A897#3*4$56# 92J25:.-A<#3'4%56# ?>9@AJ.1<?2)'#3%4(56# ?>9@AJ.B<?><#3$4(56# ?>9@AJ.><J/F80-#3$4$56# ?>9@AJ.0A:</C./8-2#3$4%56# ?>9@AJ.D<F@-<>2.@A:0>#3$4,56# KA>29:92># L<ID2#
 
@@ -444,11 +448,9 @@ Detailed performance metrics. In Figure 11 we show the fraction of instructions 
 
 Figure 12 breaks down the total execution time into four activities: interpreting bytecodes while not recording, recording traces (including time taken to interpret the recorded trace), compiling traces to native code, and executing native code traces.
 
-These detailed metrics allow us to estimate parameters for a simple model of tracing performance. These estimates should be considered very rough, as the values observed on the individual benchmarks have large standard deviations (on the order of themean). We exclude regexp-dna from the following calculations, because most of its time is spent in the regular expression matcher, which has much different performance characteristics from the other programs. (Note that this only makes a difference of about 10% in the results.) Dividing the total execution time in processor clock cycles by the number of bytecodes executed in the base interpreter shows that on average, a bytecode executes in about 35 cycles. Native traces take about 9 cycles per bytecode, a 3.9x speedup over the interpreter.
+These detailed metrics allow us to estimate parameters for a simple model of tracing performance. These estimates should be considered very rough, as the values observed on the individual benchmarks have large standard deviations (on the order of the mean). We exclude regexp-dna from the following calculations, because most of its time is spent in the regular expression matcher, which has much different performance characteristics from the other programs. (Note that this only makes a difference of about 10% in the results.) Dividing the total execution time in processor clock cycles by the number of bytecodes executed in the base interpreter shows that on average, a bytecode executes in about 35 cycles. Native traces take about 9 cycles per bytecode, a 3.9x speedup over the interpreter.
 
-Loops Trees Traces Aborts Flushes Trees/Loop Traces/Tree Traces/Loop Speedup 3d-cube 25 27 29 3 0 1.1 1.1 1.2 2.20x 3d-morph 5 8 8 2 0 1.6 1.0 1.6 2.86x 3d-raytrace 10 25 100 10 1 2.5 4.0 10.0 1.18x access-binary-trees 0 0 0 5 0 - - - 0.93x access-fannkuch 10 34 57 24 0 3.4 1.7 5.7 2.20x
-
-access-nbody 8 16 18 5 0 2.0 1.1 2.3 4.19x access-nsieve 3 6 8 3 0 2.0 1.3 2.7 3.05x bitops-3bit-bits-in-byte 2 2 2 0 0 1.0 1.0 1.0 25.47x bitops-bits-in-byte 3 3 4 1 0 1.0 1.3 1.3 8.67x bitops-bitwise-and 1 1 1 0 0 1.0 1.0 1.0 25.20x bitops-nsieve-bits 3 3 5 0 0 1.0 1.7 1.7 2.75x controlflow-recursive 0 0 0 1 0 - - - 0.98x crypto-aes 50 72 78 19 0 1.4 1.1 1.6 1.64x crypto-md5 4 4 5 0 0 1.0 1.3 1.3 2.30x crypto-sha1 5 5 10 0 0 1.0 2.0 2.0 5.95x date-format-tofte 3 3 4 7 0 1.0 1.3 1.3 1.07x date-format-xparb 3 3 11 3 0 1.0 3.7 3.7 0.98x math-cordic 2 4 5 1 0 2.0 1.3 2.5 4.92x math-partial-sums 2 4 4 1 0 2.0 1.0 2.0 5.90x math-spectral-norm 15 20 20 0 0 1.3 1.0 1.3 7.12x regexp-dna 2 2 2 0 0 1.0 1.0 1.0 4.21x string-base64 3 5 7 0 0 1.7 1.4 2.3 2.53x string-fasta 5 11 15 6 0 2.2 1.4 3.0 1.49x string-tagcloud 3 6 6 5 0 2.0 1.0 2.0 1.09x string-unpack-code 4 4 37 0 0 1.0 9.3 9.3 1.20x string-validate-input 6 10 13 1 0 1.7 1.3 2.2 1.86x
+Loops Trees Traces Aborts Flushes Trees/Loop Traces/Tree Traces/Loop Speedup 3d-cube 25 27 29 3 0 1.1 1.1 1.2 2.20x 3d-morph 5 8 8 2 0 1.6 1.0 1.6 2.86x 3d-raytrace 10 25 100 10 1 2.5 4.0 10.0 1.18x access-binary-trees 0 0 0 5 0 - - - 0.93x access-fannkuch 10 34 57 24 0 3.4 1.7 5.7 2.20x access-nbody 8 16 18 5 0 2.0 1.1 2.3 4.19x access-nsieve 3 6 8 3 0 2.0 1.3 2.7 3.05x bitops-3bit-bits-in-byte 2 2 2 0 0 1.0 1.0 1.0 25.47x bitops-bits-in-byte 3 3 4 1 0 1.0 1.3 1.3 8.67x bitops-bitwise-and 1 1 1 0 0 1.0 1.0 1.0 25.20x bitops-nsieve-bits 3 3 5 0 0 1.0 1.7 1.7 2.75x controlflow-recursive 0 0 0 1 0 - - - 0.98x crypto-aes 50 72 78 19 0 1.4 1.1 1.6 1.64x crypto-md5 4 4 5 0 0 1.0 1.3 1.3 2.30x crypto-sha1 5 5 10 0 0 1.0 2.0 2.0 5.95x date-format-tofte 3 3 4 7 0 1.0 1.3 1.3 1.07x date-format-xparb 3 3 11 3 0 1.0 3.7 3.7 0.98x math-cordic 2 4 5 1 0 2.0 1.3 2.5 4.92x math-partial-sums 2 4 4 1 0 2.0 1.0 2.0 5.90x math-spectral-norm 15 20 20 0 0 1.3 1.0 1.3 7.12x regexp-dna 2 2 2 0 0 1.0 1.0 1.0 4.21x string-base64 3 5 7 0 0 1.7 1.4 2.3 2.53x string-fasta 5 11 15 6 0 2.2 1.4 3.0 1.49x string-tagcloud 3 6 6 5 0 2.0 1.0 2.0 1.09x string-unpack-code 4 4 37 0 0 1.0 9.3 9.3 1.20x string-validate-input 6 10 13 1 0 1.7 1.3 2.2 1.86x
 
 Figure 13. Detailed trace recording statistics for the SunSpider benchmark set.
 
@@ -458,7 +460,7 @@ The other VMs we compared with achieve an overall speedup of 3.0x relative to ou
 
 These estimates also indicate that our startup performance could be substantially better if we improved the speed of trace recording and compilation. The estimated 200x slowdown for recording and compilation is very rough, and may be influenced by startup factors in the interpreter (e.g., caches that have not warmed up yet during recording). One observation supporting this conjecture is that in the tracer, interpreted bytecodes take about 180 cycles to run. Still, recording and compilation are clearly both expensive, and a better implementation, possibly including redesign of the LIR abstract syntax or encoding, would improve startup performance.
 
-Our performance results confirm that type specialization using trace trees substantially improves performance. We are able to outperform the fastest available JavaScript compiler (V8) and thefastest available JavaScript inline threaded interpreter (SFX) on 9 of 26 benchmarks.
+Our performance results confirm that type specialization using trace trees substantially improves performance. We are able to outperform the fastest available JavaScript compiler (V8) and the fastest available JavaScript inline threaded interpreter (SFX) on 9 of 26 benchmarks.
 
 8. Related Work
 
@@ -472,7 +474,7 @@ General trace optimization. General trace optimization has a longer history that
 
 Dynamo (7) by Bala et al, introduced native code tracing as a replacement for profile-guided optimization (PGO). A major goal was to perform PGO online so that the profile was specific to the current execution. Dynamo used loop headers as candidate hot traces, but did not try to create loop traces specifically.
 
-Trace trees were originally proposed by Gal et al. (11) in the context of Java, a statically typed language. Their trace trees actually inlined parts of outer loops within the inner loops (becauseinner loops become hot first), leading to much greater tail duplication.
+Trace trees were originally proposed by Gal et al. (11) in the context of Java, a statically typed language. Their trace trees actually inlined parts of outer loops within the inner loops (because inner loops become hot first), leading to much greater tail duplication.
 
 !"# $!"# %!"# &!"# '!"# (!!"# )*+,-./#0$1$23# )*+45678#0$1923# )*+6:;<6:,/#0(1$23# :,,/==+.>?:6;+<6//=#0!1923# :,,/==+@:??A-,8#0$1$23# :,,/==+?.5*;#0%1$23# :,,/==+?=>/B/#0)1!23# .><57=+).><+.><=+>?+.;</#0$C1C23# .><57=+.><=+>?+.;</#0'1D23# .><57=+.><E>=/+:?*#0$C1$23# .><57=+?=>/B/+.><=#0$1D23# ,5?<65FG5E+6/,-6=>B/#0(1!23# ,6;7<5+:/=#0(1&23# ,6;7<5+4*C#0$1)23# ,6;7<5+=8:(#0C1923# *:</+@564:<+<5H/#0(1(23# *:</+@564:<+27:6.#0(1!23# 4:<8+,56*>,#0%1923# 4:<8+7:6I:F+=-4=#0C1923# 4:<8+=7/,<6:F+?564#0D1(23# 6/J/27+*?:#0%1$23# =<6>?J+.:=/&%#0$1C23# =<6>?J+@:=<:#0(1C23# =<6>?J+<:J,F5-*#0(1(23# =<6>?J+-?7:,A+,5*/#0(1$23# =<6>?J+B:F>*:</+>?7-<#0(1923# K?</676/<# L5?><56# M/,56*# N547>F/# N:FF#O6:,/# M-?#O6:,/#
 
@@ -490,9 +492,7 @@ Salib (17) designed a type inference algorithm for Python based on the Cartesian
 
 McCloskey (14) has work in progress based on a languageindependent type inference that is used to generate efficient C implementations of JavaScript and Python programs.
 
-Native code generation by interpreters. The traditional interpreter design is a virtual machine that directly executes ASTs or machine-code-like bytecodes. Researchers have shown how to gen-
-
-erate native code with nearly the same structure but better performance.
+Native code generation by interpreters. The traditional interpreter design is a virtual machine that directly executes ASTs or machine-code-like bytecodes. Researchers have shown how to generate native code with nearly the same structure but better performance.
 
 Call threading, also known as context threading (8), compiles methods by generating a native call instruction to an interpreter method for each interpreter bytecode. A call-return pair has been shown to be a potentially much more efficient dispatch mechanism than the indirect jumps used in standard bytecode interpreters.
 
@@ -520,7 +520,7 @@ Acknowledgments
 
 Parts of this effort have been sponsored by the National Science Foundation under grants CNS-0615443 and CNS-0627747, as well as by the California MICRO Program and industrial sponsor Sun Microsystems under Project No. 07-127.
 
-The U.S. Government is authorized to reproduce and distribute reprints for Governmental purposes notwithstanding any copyright annotation thereon. Any opinions, findings, and conclusions or recommendations expressed here are those of the author and shouldnot be interpreted as necessarily representing the official views, policies or endorsements, either expressed or implied, of the National Science foundation (NSF), any other agency of the U.S. Government, or any of the companies mentioned above.
+The U.S. Government is authorized to reproduce and distribute reprints for Governmental purposes notwithstanding any copyright annotation thereon. Any opinions, findings, and conclusions or recommendations expressed here are those of the author and should not be interpreted as necessarily representing the official views, policies or endorsements, either expressed or implied, of the National Science foundation (NSF), any other agency of the U.S. Government, or any of the companies mentioned above.
 
 References
 

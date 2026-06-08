@@ -113,18 +113,18 @@ export type Target = {
   url?: string;
 };
 /**
- * Logical content range on a page: [startPoint, endPoint]. Each point is a ref path with an optional terminal text offset.
+ * Half-open content boundary range covered by this page. Empty pages use equal boundaries.
  *
  * @minItems 2
  * @maxItems 2
  */
-export type PageContentRange = [PageContentPoint, PageContentPoint];
+export type PageContentRange = [PageContentBoundary, PageContentBoundary];
 /**
- * Path to a content node, with an optional terminal text offset when the referenced node is text.
+ * Boundary position in document content. A top-level value equal to content.length is valid and means document end; deeper paths may include a terminal text offset.
  *
  * @minItems 1
  */
-export type PageContentPoint = [number, ...number[]];
+export type PageContentBoundary = [number, ...number[]];
 /**
  * Block nodes valid as document content, inside containers, and at top level. Excludes structural-only children (ListItemNode, TableRowNode, TableCellNode) that only appear inside their parent containers.
  */
@@ -174,9 +174,15 @@ export type PdfAnchor = {
  */
 export type PageRect = [number, number, number, number, number];
 /**
- * True if this is artifact content (header, footer, margin, etc.).
+ * Reference to the adjacent physical block that is part of the same logical block.
+ *
+ * @minItems 1
  */
-export type ArtifactFlag = boolean;
+export type PartRef = [number, ...number[]];
+/**
+ * Semantic flow classification assigned by layout extraction on top-level content blocks. Missing means body; new producers omit body.
+ */
+export type FlowClass = "auxiliary" | "excluded";
 
 /**
  * Single outline entry.
@@ -221,10 +227,7 @@ export interface PageInfo {
    * Human-readable page label (e.g. 'i', '15', 'A-3').
    */
   label?: string;
-  /**
-   * Content ranges that appear on this page.
-   */
-  contentRanges?: PageContentRange[];
+  contentRange: PageContentRange;
 }
 /**
  * Paragraph block (inline text only).
@@ -245,7 +248,9 @@ export interface ParagraphNode {
   reference?: boolean;
   refs?: RefsArray;
   backRefs?: BackRefsArray;
-  artifact?: ArtifactFlag;
+  previousPart?: PartRef;
+  nextPart?: PartRef;
+  flowClass?: FlowClass;
 }
 /**
  * Inline text node with optional styling and references.
@@ -299,7 +304,9 @@ export interface HeadingNode {
   anchor: Anchor;
   refs?: RefsArray;
   backRefs?: BackRefsArray;
-  artifact?: ArtifactFlag;
+  previousPart?: PartRef;
+  nextPart?: PartRef;
+  flowClass?: FlowClass;
 }
 /**
  * Math block represented as inline text nodes.
@@ -316,7 +323,9 @@ export interface MathNode {
   anchor: Anchor;
   refs?: RefsArray;
   backRefs?: BackRefsArray;
-  artifact?: ArtifactFlag;
+  previousPart?: PartRef;
+  nextPart?: PartRef;
+  flowClass?: FlowClass;
 }
 /**
  * Image block with optional inline text (alt text, labels).
@@ -333,7 +342,9 @@ export interface ImageNode {
   anchor: Anchor;
   refs?: RefsArray;
   backRefs?: BackRefsArray;
-  artifact?: ArtifactFlag;
+  previousPart?: PartRef;
+  nextPart?: PartRef;
+  flowClass?: FlowClass;
 }
 /**
  * Blockquote block that contains other blocks.
@@ -350,7 +361,9 @@ export interface BlockquoteNode {
   anchor: Anchor;
   refs?: RefsArray;
   backRefs?: BackRefsArray;
-  artifact?: ArtifactFlag;
+  previousPart?: PartRef;
+  nextPart?: PartRef;
+  flowClass?: FlowClass;
 }
 /**
  * List block containing list items.
@@ -377,7 +390,9 @@ export interface ListNode {
   anchor: Anchor;
   refs?: RefsArray;
   backRefs?: BackRefsArray;
-  artifact?: ArtifactFlag;
+  previousPart?: PartRef;
+  nextPart?: PartRef;
+  flowClass?: FlowClass;
 }
 /**
  * Single list item: contains either inline text (simple items) or block children (items with nested structure).
@@ -398,7 +413,8 @@ export interface ListItemNode {
   reference?: boolean;
   refs?: RefsArray;
   backRefs?: BackRefsArray;
-  artifact?: ArtifactFlag;
+  previousPart?: PartRef;
+  nextPart?: PartRef;
 }
 /**
  * Top-level table block.
@@ -415,7 +431,9 @@ export interface TableNode {
   anchor: Anchor;
   refs?: RefsArray;
   backRefs?: BackRefsArray;
-  artifact?: ArtifactFlag;
+  previousPart?: PartRef;
+  nextPart?: PartRef;
+  flowClass?: FlowClass;
 }
 /**
  * Single table row.
@@ -434,7 +452,8 @@ export interface TableRowNode {
   anchor: Anchor;
   refs?: RefsArray;
   backRefs?: BackRefsArray;
-  artifact?: ArtifactFlag;
+  previousPart?: PartRef;
+  nextPart?: PartRef;
 }
 /**
  * Table cell container (header or data cell).
@@ -467,7 +486,8 @@ export interface TableCellNode {
   anchor: Anchor;
   refs?: RefsArray;
   backRefs?: BackRefsArray;
-  artifact?: ArtifactFlag;
+  previousPart?: PartRef;
+  nextPart?: PartRef;
 }
 /**
  * Shared caption block (for tables, figures, images, groups, etc.).
@@ -484,7 +504,9 @@ export interface CaptionNode {
   anchor: Anchor;
   refs?: RefsArray;
   backRefs?: BackRefsArray;
-  artifact?: ArtifactFlag;
+  previousPart?: PartRef;
+  nextPart?: PartRef;
+  flowClass?: FlowClass;
 }
 /**
  * Note block used across the document (including table-local notes).
@@ -501,11 +523,13 @@ export interface NoteNode {
   anchor: Anchor;
   refs?: RefsArray;
   backRefs?: BackRefsArray;
+  previousPart?: PartRef;
+  nextPart?: PartRef;
+  flowClass?: FlowClass;
   /**
    * True if this block is a reference entry (e.g. bibliography item).
    */
   reference?: boolean;
-  artifact?: ArtifactFlag;
 }
 /**
  * Preformatted block with whitespace-significant text.
@@ -522,5 +546,7 @@ export interface PreformattedNode {
   anchor: Anchor;
   refs?: RefsArray;
   backRefs?: BackRefsArray;
-  artifact?: ArtifactFlag;
+  previousPart?: PartRef;
+  nextPart?: PartRef;
+  flowClass?: FlowClass;
 }

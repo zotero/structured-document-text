@@ -4,7 +4,6 @@
 
 import { deepEqual } from './utils.js';
 import { mergeDeltaMaps } from './dom/deltamap.js';
-import { makeContentRange } from './range.js';
 
 function canMerge(a, b) {
 	let aAnc = a.anchor ?? null;
@@ -198,39 +197,4 @@ export function getNestedBlockPlainText(node) {
 		if (text) parts.push(text);
 	}
 	return parts.join('\n');
-}
-
-/**
- * Get a content range (start/end ref paths) spanning block indexes.
- */
-export function getContentRange(content, startOffset, endOffset) {
-	function firstLeafPath(node, path) {
-		let current = node;
-		let currentPath = [...path];
-		while (current.content && current.content.length > 0) {
-			current = current.content[0];
-			currentPath.push(0);
-		}
-		return currentPath;
-	}
-
-	function lastLeafPath(node, path) {
-		let current = node;
-		let currentPath = [...path];
-		while (current.content && current.content.length > 0) {
-			let lastIndex = current.content.length - 1;
-			current = current.content[lastIndex];
-			currentPath.push(lastIndex);
-		}
-		return currentPath;
-	}
-
-	let maxIndex = content.length - 1;
-	let safeStart = Math.max(0, Math.min(startOffset, maxIndex));
-	let safeEnd = Math.max(0, Math.min(endOffset, maxIndex));
-
-	return makeContentRange(
-		firstLeafPath(content[safeStart], [safeStart]),
-		lastLeafPath(content[safeEnd], [safeEnd]),
-	);
 }

@@ -167,9 +167,14 @@
         "$ref": "#/$defs/RefPath"
       }
     },
-    "ArtifactFlag": {
-      "type": "boolean",
-      "description": "True if this is artifact content (header, footer, margin, etc.)."
+    "PartRef": {
+      "description": "Reference to the adjacent physical block that is part of the same logical block.",
+      "$ref": "#/$defs/RefPath"
+    },
+    "FlowClass": {
+      "type": "string",
+      "description": "Semantic flow classification assigned by layout extraction on top-level content blocks. Missing means body; new producers omit body.",
+      "enum": ["auxiliary", "excluded"]
     },
     "PageRect": {
       "description": "Block bounding box: [pageIndex, x1, y1, x2, y2] (page coordinates).",
@@ -440,7 +445,9 @@
         },
         "refs": { "$ref": "#/$defs/RefsArray" },
         "backRefs": { "$ref": "#/$defs/BackRefsArray" },
-        "artifact": { "$ref": "#/$defs/ArtifactFlag" }
+        "previousPart": { "$ref": "#/$defs/PartRef" },
+        "nextPart": { "$ref": "#/$defs/PartRef" },
+        "flowClass": { "$ref": "#/$defs/FlowClass" }
       }
     },
     "HeadingNode": {
@@ -465,7 +472,9 @@
         },
         "refs": { "$ref": "#/$defs/RefsArray" },
         "backRefs": { "$ref": "#/$defs/BackRefsArray" },
-        "artifact": { "$ref": "#/$defs/ArtifactFlag" }
+        "previousPart": { "$ref": "#/$defs/PartRef" },
+        "nextPart": { "$ref": "#/$defs/PartRef" },
+        "flowClass": { "$ref": "#/$defs/FlowClass" }
       }
     },
     "MathNode": {
@@ -490,7 +499,9 @@
         },
         "refs": { "$ref": "#/$defs/RefsArray" },
         "backRefs": { "$ref": "#/$defs/BackRefsArray" },
-        "artifact": { "$ref": "#/$defs/ArtifactFlag" }
+        "previousPart": { "$ref": "#/$defs/PartRef" },
+        "nextPart": { "$ref": "#/$defs/PartRef" },
+        "flowClass": { "$ref": "#/$defs/FlowClass" }
       }
     },
     "ImageNode": {
@@ -515,7 +526,9 @@
         },
         "refs": { "$ref": "#/$defs/RefsArray" },
         "backRefs": { "$ref": "#/$defs/BackRefsArray" },
-        "artifact": { "$ref": "#/$defs/ArtifactFlag" }
+        "previousPart": { "$ref": "#/$defs/PartRef" },
+        "nextPart": { "$ref": "#/$defs/PartRef" },
+        "flowClass": { "$ref": "#/$defs/FlowClass" }
       }
     },
     "BlockquoteNode": {
@@ -540,7 +553,9 @@
         },
         "refs": { "$ref": "#/$defs/RefsArray" },
         "backRefs": { "$ref": "#/$defs/BackRefsArray" },
-        "artifact": { "$ref": "#/$defs/ArtifactFlag" }
+        "previousPart": { "$ref": "#/$defs/PartRef" },
+        "nextPart": { "$ref": "#/$defs/PartRef" },
+        "flowClass": { "$ref": "#/$defs/FlowClass" }
       }
     },
     "ListItemNode": {
@@ -569,7 +584,8 @@
         },
         "refs": { "$ref": "#/$defs/RefsArray" },
         "backRefs": { "$ref": "#/$defs/BackRefsArray" },
-        "artifact": { "$ref": "#/$defs/ArtifactFlag" }
+        "previousPart": { "$ref": "#/$defs/PartRef" },
+        "nextPart": { "$ref": "#/$defs/PartRef" }
       }
     },
     "ListNode": {
@@ -605,7 +621,9 @@
         },
         "refs": { "$ref": "#/$defs/RefsArray" },
         "backRefs": { "$ref": "#/$defs/BackRefsArray" },
-        "artifact": { "$ref": "#/$defs/ArtifactFlag" }
+        "previousPart": { "$ref": "#/$defs/PartRef" },
+        "nextPart": { "$ref": "#/$defs/PartRef" },
+        "flowClass": { "$ref": "#/$defs/FlowClass" }
       }
     },
     "CaptionNode": {
@@ -633,7 +651,9 @@
           "$ref": "#/$defs/RefsArray"
         },
         "backRefs": { "$ref": "#/$defs/BackRefsArray" },
-        "artifact": { "$ref": "#/$defs/ArtifactFlag" }
+        "previousPart": { "$ref": "#/$defs/PartRef" },
+        "nextPart": { "$ref": "#/$defs/PartRef" },
+        "flowClass": { "$ref": "#/$defs/FlowClass" }
       }
     },
     "NoteNode": {
@@ -661,11 +681,13 @@
           "$ref": "#/$defs/RefsArray"
         },
         "backRefs": { "$ref": "#/$defs/BackRefsArray" },
+        "previousPart": { "$ref": "#/$defs/PartRef" },
+        "nextPart": { "$ref": "#/$defs/PartRef" },
+        "flowClass": { "$ref": "#/$defs/FlowClass" },
         "reference": {
           "type": "boolean",
           "description": "True if this block is a reference entry (e.g. bibliography item)."
-        },
-        "artifact": { "$ref": "#/$defs/ArtifactFlag" }
+        }
       }
     },
     "TableCellNode": {
@@ -709,7 +731,8 @@
         },
         "refs": { "$ref": "#/$defs/RefsArray" },
         "backRefs": { "$ref": "#/$defs/BackRefsArray" },
-        "artifact": { "$ref": "#/$defs/ArtifactFlag" }
+        "previousPart": { "$ref": "#/$defs/PartRef" },
+        "nextPart": { "$ref": "#/$defs/PartRef" }
       }
     },
     "TableRowNode": {
@@ -735,7 +758,8 @@
         },
         "refs": { "$ref": "#/$defs/RefsArray" },
         "backRefs": { "$ref": "#/$defs/BackRefsArray" },
-        "artifact": { "$ref": "#/$defs/ArtifactFlag" }
+        "previousPart": { "$ref": "#/$defs/PartRef" },
+        "nextPart": { "$ref": "#/$defs/PartRef" }
       }
     },
     "TableNode": {
@@ -760,7 +784,9 @@
         },
         "refs": { "$ref": "#/$defs/RefsArray" },
         "backRefs": { "$ref": "#/$defs/BackRefsArray" },
-        "artifact": { "$ref": "#/$defs/ArtifactFlag" }
+        "previousPart": { "$ref": "#/$defs/PartRef" },
+        "nextPart": { "$ref": "#/$defs/PartRef" },
+        "flowClass": { "$ref": "#/$defs/FlowClass" }
       }
     },
     "PreformattedNode": {
@@ -785,7 +811,9 @@
         },
         "refs": { "$ref": "#/$defs/RefsArray" },
         "backRefs": { "$ref": "#/$defs/BackRefsArray" },
-        "artifact": { "$ref": "#/$defs/ArtifactFlag" }
+        "previousPart": { "$ref": "#/$defs/PartRef" },
+        "nextPart": { "$ref": "#/$defs/PartRef" },
+        "flowClass": { "$ref": "#/$defs/FlowClass" }
       }
     },
     "ContentBlockNode": {
@@ -846,9 +874,9 @@
         }
       }
     },
-    "PageContentPoint": {
+    "PageContentBoundary": {
       "type": "array",
-      "description": "Path to a content node, with an optional terminal text offset when the referenced node is text.",
+      "description": "Boundary position in document content. A top-level value equal to content.length is valid and means document end; deeper paths may include a terminal text offset.",
       "minItems": 1,
       "items": {
         "type": "integer",
@@ -857,17 +885,18 @@
     },
     "PageContentRange": {
       "type": "array",
-      "description": "Logical content range on a page: [startPoint, endPoint]. Each point is a ref path with an optional terminal text offset.",
+      "description": "Half-open logical content range on a page: [startBoundary, endBoundary). Empty pages use equal boundaries.",
       "minItems": 2,
       "maxItems": 2,
       "items": {
-        "$ref": "#/$defs/PageContentPoint"
+        "$ref": "#/$defs/PageContentBoundary"
       }
     },
     "PageInfo": {
       "type": "object",
       "description": "Per-page metadata for the source document.",
       "additionalProperties": false,
+      "required": ["contentRange"],
       "properties": {
         "fingerprint": {
           "type": "string",
@@ -899,12 +928,9 @@
           "type": "string",
           "description": "Human-readable page label (e.g. 'i', '15', 'A-3')."
         },
-        "contentRanges": {
-          "type": "array",
-          "description": "Content ranges that appear on this page.",
-          "items": {
-            "$ref": "#/$defs/PageContentRange"
-          }
+        "contentRange": {
+          "description": "Half-open content boundary range covered by this page. Empty pages use equal boundaries.",
+          "$ref": "#/$defs/PageContentRange"
         }
       }
     }

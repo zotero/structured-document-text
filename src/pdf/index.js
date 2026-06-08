@@ -12,6 +12,7 @@ export { charsToTextNodes, charsToPreformattedTextNodes } from './encode.js';
 
 // Decoding (textMap → positions)
 export { parseTextMap, reconstructCharPositions, buildRunData } from './decode.js';
+export { stringifyTextMap, optimizeTextMapRun } from './text-map.js';
 
 // Text node utilities
 export { canMergeTextNodes, mergeSequentialTextNodes } from './text-node.js';
@@ -23,16 +24,13 @@ export {
 	getBlockText,
 	getNextBlockRef,
 	getTextNodesAtRange,
-	getContentRangeFromBlocks,
 	nextChar,
 	nextBlockChar,
 } from './block.js';
 
-// Block transformations (mutations, reordering, merging)
+// Block transformations
 export {
 	applyTextAttributes,
-	pushArtifactsToTheEnd,
-	mergeBlocks,
 } from './block-transform.js';
 
 // Debug utilities

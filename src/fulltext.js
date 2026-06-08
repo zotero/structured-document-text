@@ -1,4 +1,10 @@
-import { splitContentRange } from './range.js';
+import {
+	compareRefs,
+	refKey,
+	sameRef,
+	walkContentRangeLeafBlocks,
+} from './range.js';
+import { getPartBoundarySeparator, shouldDropHardHyphenAtPartBoundary } from './parts.js';
 
 /**
  * Convert a structure object into a fulltext string for the given page indexes.
@@ -8,86 +14,157 @@ import { splitContentRange } from './range.js';
  * @returns {string} The fulltext string, NFC normalized
  */
 export function getFulltextFromStructuredText(structure, pageIndexes) {
-	const emittedTextSpans = new Map();
-	const blockTextIndexes = new Map();
-	const blockTexts = [];
 	const content = Array.isArray(structure?.content) ? structure.content : [];
 	const pages = Array.isArray(structure?.catalog?.pages) ? structure.catalog.pages : [];
+	const entries = [];
+	const entriesByRef = new Map();
+	const blockTexts = [];
+	let previous = null;
 
 	for (const pageIndex of pageIndexes) {
 		const page = pages[pageIndex];
-		if (!page || !Array.isArray(page.contentRanges)) continue;
-
-		for (const range of page.contentRanges) {
-			for (const entry of getRangeBlockTexts(content, range, emittedTextSpans)) {
-				if (!entry.text) {
-					continue;
-				}
-				const existingIndex = blockTextIndexes.get(entry.blockIndex);
-				if (existingIndex === undefined) {
-					blockTextIndexes.set(entry.blockIndex, blockTexts.length);
-					blockTexts.push(entry.text);
-				}
-				else {
-					blockTexts[existingIndex] += entry.text;
-				}
+		if (!page) {
+			continue;
+		}
+		for (const entry of getRangeBlockTexts(content, page.contentRange)) {
+			if (!entry.text) {
+				continue;
+			}
+			entry.index = entries.length;
+			entries.push(entry);
+			const key = refKey(entry.ref);
+			const slices = entriesByRef.get(key);
+			if (slices) {
+				slices.push(entry);
+			}
+			else {
+				entriesByRef.set(key, [entry]);
 			}
 		}
 	}
 
-	return blockTexts.join('\n\n').replace(/[ \t]+$/gm, '').trim();
-}
-
-function getRangeBlockTexts(content, range, emittedTextSpans) {
-	let parts;
-	try {
-		parts = splitContentRange(range, content);
-	}
-	catch (_) {
-		return [];
-	}
-
-	const startTopLevel = parts.start.ref?.[0];
-	const endTopLevel = parts.end.ref?.[0];
-	if (
-		!Number.isInteger(startTopLevel)
-		|| !Number.isInteger(endTopLevel)
-		|| startTopLevel > endTopLevel
-	) {
-		return [];
-	}
-
-	const blockTexts = [];
-	for (let i = startTopLevel; i <= endTopLevel; i++) {
-		const block = content[i];
-		if (!block || block.artifact) {
+	const emittedIndexes = new Set();
+	for (const entry of entries) {
+		if (emittedIndexes.has(entry.index)) {
 			continue;
 		}
-		const text = getBlockRangeText(
-			block,
-			[i],
-			i === startTopLevel ? parts.start : null,
-			i === endTopLevel ? parts.end : null,
-			emittedTextSpans
-		);
-		if (text) {
-			blockTexts.push({ blockIndex: i, text });
+
+		const chain = getSelectedPartChain(entry, entriesByRef, emittedIndexes);
+		for (let i = 0; i < chain.length; i++) {
+			const part = chain[i];
+			if (i === 0) {
+				if (previous) {
+					blockTexts.push(getEntrySeparator(previous, part));
+				}
+			}
+			else if (sameRef(chain[i - 1].ref, part.ref)) {
+				blockTexts.push(getEntrySeparator(chain[i - 1], part));
+			}
+			else {
+				if (shouldDropHardHyphenAtPartBoundary(chain[i - 1].block, part.block)) {
+					stripTrailingHyphen(blockTexts);
+				}
+				blockTexts.push(getPartBoundarySeparator(chain[i - 1].block, part.block));
+			}
+			blockTexts.push(part.text);
+			emittedIndexes.add(part.index);
+			previous = part;
 		}
 	}
+
+	return blockTexts.join('').replace(/[ \t]+$/gm, '').trim();
+}
+
+function stripTrailingHyphen(blockTexts) {
+	const lastIndex = blockTexts.length - 1;
+	if (lastIndex < 0 || !blockTexts[lastIndex].endsWith('-')) {
+		return;
+	}
+	blockTexts[lastIndex] = blockTexts[lastIndex].slice(0, -1);
+}
+
+function getSelectedPartChain(entry, entriesByRef, emittedIndexes) {
+	const chain = [];
+	const seenRefs = new Set();
+	let current = entry;
+	while (current && !emittedIndexes.has(current.index)) {
+		const key = refKey(current.ref);
+		if (seenRefs.has(key)) {
+			break;
+		}
+		seenRefs.add(key);
+		// A block split by page boundaries yields one slice per page; keep
+		// them all together before following the part link.
+		for (const slice of entriesByRef.get(key)) {
+			if (!emittedIndexes.has(slice.index)) {
+				chain.push(slice);
+			}
+		}
+
+		if (!Array.isArray(current.block?.nextPart)) {
+			break;
+		}
+		current = entriesByRef.get(refKey(current.block.nextPart))?.[0];
+	}
+	return chain;
+}
+
+function getEntrySeparator(previous, current) {
+	if (sameBlockSlicesTouch(previous, current)) {
+		return '';
+	}
+	if (arePartNeighbors(previous, current)) {
+		return getPartBoundarySeparator(previous.block, current.block);
+	}
+	return getOutputSeparator(previous.ref, current.ref);
+}
+
+function sameBlockSlicesTouch(previous, current) {
+	return sameRef(previous.ref, current.ref)
+		&& (
+			samePoint(previous.endPoint, current.startPoint)
+			|| samePoint(current.endPoint, previous.startPoint)
+		);
+}
+
+function arePartNeighbors(previous, current) {
+	return sameRef(previous.block?.nextPart, current.ref)
+		|| sameRef(current.block?.previousPart, previous.ref)
+		|| sameRef(previous.block?.previousPart, current.ref)
+		|| sameRef(current.block?.nextPart, previous.ref);
+}
+
+function samePoint(a, b) {
+	return sameRef(a?.ref, b?.ref) && a?.offset === b?.offset;
+}
+
+function getRangeBlockTexts(content, range) {
+	const blockTexts = [];
+	walkContentRangeLeafBlocks(content, range, ({ block, ref, startPoint, endPoint }) => {
+		if (block.flowClass === 'excluded') {
+			return;
+		}
+		const text = getBlockRangeText(block, ref, startPoint, endPoint);
+		if (text) {
+			blockTexts.push({ ref, block, text, startPoint, endPoint });
+		}
+	});
 	return blockTexts;
 }
 
-function getBlockRangeText(block, blockRef, startPoint, endPoint, emittedTextSpans) {
+function getBlockRangeText(block, blockRef, startPoint, endPoint) {
 	const segments = flattenPlainTextSegments(block, blockRef);
 	if (!segments.some(segment => segment.type === 'text')) {
 		return '';
 	}
 
-	const startIndex = startPoint?.ref
-		? findBoundarySegmentIndex(segments, startPoint.ref, 'start')
+	const blockStartPoint = getPointInBlock(startPoint, blockRef);
+	const blockEndPoint = getPointInBlock(endPoint, blockRef);
+	const startIndex = blockStartPoint
+		? findStartSegmentIndex(segments, blockStartPoint)
 		: findFirstTextSegmentIndex(segments);
-	const endIndex = endPoint?.ref
-		? findBoundarySegmentIndex(segments, endPoint.ref, 'end')
+	const endIndex = blockEndPoint
+		? findEndSegmentIndex(segments, blockEndPoint)
 		: findLastTextSegmentIndex(segments);
 
 	if (startIndex === -1 || endIndex === -1 || startIndex > endIndex) {
@@ -103,11 +180,10 @@ function getBlockRangeText(block, blockRef, startPoint, endPoint, emittedTextSpa
 			continue;
 		}
 
-		const text = getUnemittedSegmentText(
+		const text = getSegmentRangeText(
 			segment,
-			i === startIndex ? startPoint : null,
-			i === endIndex ? endPoint : null,
-			emittedTextSpans
+			i === startIndex ? blockStartPoint : null,
+			i === endIndex ? blockEndPoint : null
 		);
 		if (!text) {
 			continue;
@@ -120,6 +196,20 @@ function getBlockRangeText(block, blockRef, startPoint, endPoint, emittedTextSpa
 		parts.push(text);
 	}
 	return parts.join('');
+}
+
+function getPointInBlock(point, blockRef) {
+	if (!isRefPrefix(blockRef, point?.ref)) {
+		return null;
+	}
+	return point;
+}
+
+function isRefPrefix(prefix, ref) {
+	return Array.isArray(prefix)
+		&& Array.isArray(ref)
+		&& prefix.length <= ref.length
+		&& prefix.every((value, index) => value === ref[index]);
 }
 
 function flattenPlainTextSegments(node, ref) {
@@ -163,7 +253,7 @@ function flattenPlainTextSegments(node, ref) {
 	return segments;
 }
 
-function getUnemittedSegmentText(segment, startPoint, endPoint, emittedTextSpans) {
+function getSegmentRangeText(segment, startPoint, endPoint) {
 	const length = segment.text.length;
 	if (!length) {
 		return '';
@@ -174,30 +264,44 @@ function getUnemittedSegmentText(segment, startPoint, endPoint, emittedTextSpans
 		: 0;
 	let endOffset = sameRef(endPoint?.ref, segment.ref) && Number.isInteger(endPoint.offset)
 		? endPoint.offset
-		: length - 1;
+		: length;
 
 	startOffset = clamp(startOffset, 0, length);
-	endOffset = clamp(endOffset, -1, length - 1);
-	if (endOffset < startOffset) {
+	endOffset = clamp(endOffset, 0, length);
+	if (endOffset <= startOffset) {
 		return '';
 	}
 
-	const start = startOffset;
-	const end = endOffset + 1;
-	const key = segment.ref.join('.');
-	const emitted = emittedTextSpans.get(key) || [];
-	const intervals = subtractIntervals(start, end, emitted);
-	if (!intervals.length) {
-		return '';
-	}
-
-	addIntervals(emitted, intervals);
-	emittedTextSpans.set(key, emitted);
-	return intervals.map(([from, to]) => segment.text.slice(from, to)).join('');
+	return segment.text.slice(startOffset, endOffset);
 }
 
-function findBoundarySegmentIndex(segments, ref, edge) {
-	let match = -1;
+function findStartSegmentIndex(segments, point) {
+	if (Number.isInteger(point.offset)) {
+		return findExactTextSegmentIndex(segments, point.ref);
+	}
+	for (let i = 0; i < segments.length; i++) {
+		const segment = segments[i];
+		if (segment.type === 'text' && compareRefs(segment.ref, point.ref) >= 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+function findEndSegmentIndex(segments, point) {
+	if (Number.isInteger(point.offset)) {
+		return findExactTextSegmentIndex(segments, point.ref);
+	}
+	for (let i = 0; i < segments.length; i++) {
+		const segment = segments[i];
+		if (segment.type === 'text' && compareRefs(segment.ref, point.ref) >= 0) {
+			return findPreviousTextSegmentIndex(segments, i - 1);
+		}
+	}
+	return findLastTextSegmentIndex(segments);
+}
+
+function findExactTextSegmentIndex(segments, ref) {
 	for (let i = 0; i < segments.length; i++) {
 		const segment = segments[i];
 		if (segment.type !== 'text') {
@@ -206,18 +310,21 @@ function findBoundarySegmentIndex(segments, ref, edge) {
 		if (sameRef(segment.ref, ref)) {
 			return i;
 		}
-		if (startsWithRef(segment.ref, ref)) {
-			match = i;
-			if (edge === 'start') {
-				return i;
-			}
-		}
 	}
-	return match;
+	return -1;
 }
 
 function findFirstTextSegmentIndex(segments) {
 	for (let i = 0; i < segments.length; i++) {
+		if (segments[i].type === 'text') {
+			return i;
+		}
+	}
+	return -1;
+}
+
+function findPreviousTextSegmentIndex(segments, index) {
+	for (let i = index; i >= 0; i--) {
 		if (segments[i].type === 'text') {
 			return i;
 		}
@@ -234,68 +341,14 @@ function findLastTextSegmentIndex(segments) {
 	return -1;
 }
 
-function subtractIntervals(start, end, emitted) {
-	const intervals = [];
-	let cursor = start;
-	for (const [from, to] of emitted) {
-		if (to <= cursor) {
-			continue;
-		}
-		if (from >= end) {
-			break;
-		}
-		if (from > cursor) {
-			intervals.push([cursor, Math.min(from, end)]);
-		}
-		cursor = Math.max(cursor, to);
-		if (cursor >= end) {
-			break;
-		}
+function getOutputSeparator(previousRef, currentRef) {
+	if (sameRef(previousRef, currentRef)) {
+		return '\n\n';
 	}
-	if (cursor < end) {
-		intervals.push([cursor, end]);
+	if (Array.isArray(previousRef) && Array.isArray(currentRef) && previousRef[0] === currentRef[0]) {
+		return '\n';
 	}
-	return intervals;
-}
-
-function addIntervals(target, intervals) {
-	target.push(...intervals);
-	target.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-
-	let write = 0;
-	for (const interval of target) {
-		if (write === 0 || interval[0] > target[write - 1][1]) {
-			target[write++] = interval;
-		}
-		else {
-			target[write - 1][1] = Math.max(target[write - 1][1], interval[1]);
-		}
-	}
-	target.length = write;
-}
-
-function startsWithRef(ref, prefix) {
-	if (!Array.isArray(ref) || !Array.isArray(prefix) || prefix.length > ref.length) {
-		return false;
-	}
-	for (let i = 0; i < prefix.length; i++) {
-		if (ref[i] !== prefix[i]) {
-			return false;
-		}
-	}
-	return true;
-}
-
-function sameRef(a, b) {
-	if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
-		return false;
-	}
-	for (let i = 0; i < a.length; i++) {
-		if (a[i] !== b[i]) {
-			return false;
-		}
-	}
-	return true;
+	return '\n\n';
 }
 
 function clamp(value, min, max) {

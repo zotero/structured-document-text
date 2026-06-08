@@ -1,6 +1,11 @@
 import { parseTextMap, buildRunData } from './decode.js';
 import { isWhitespaceChar } from './utils.js';
 import { makeContentRange } from '../range.js';
+import {
+	compareRefs,
+	refKey,
+	walkContentRangeLeafBlocks,
+} from '../range.js';
 
 function intersectRects(r1, r2) {
 	return !(
@@ -11,21 +16,13 @@ function intersectRects(r1, r2) {
 	);
 }
 
-function walkLeafBlocks(node, ref, callback) {
-	if (!node || typeof node.text === 'string') return;
-	const content = node.content;
-	if (!Array.isArray(content) || content.length === 0) {
-		callback(node, ref);
-		return;
+function makeLeafContentRange(ref) {
+	if (!Array.isArray(ref) || ref.length === 0) {
+		return null;
 	}
-	const hasChildBlock = content.some(child => child && typeof child.text !== 'string');
-	if (!hasChildBlock) {
-		callback(node, ref);
-		return;
-	}
-	for (let i = 0; i < content.length; i++) {
-		walkLeafBlocks(content[i], [...ref, i], callback);
-	}
+	const endRef = [...ref];
+	endRef[endRef.length - 1]++;
+	return makeContentRange(ref, endRef);
 }
 
 export function getRefRangesFromPageRects(structure, pageRects) {
@@ -46,43 +43,35 @@ export function getRefRangesFromPageRects(structure, pageRects) {
 
 	const refSet = new Set();
 	const refRanges = [];
+	const pages = Array.isArray(structure?.catalog?.pages) ? structure.catalog.pages : [];
+	const content = Array.isArray(structure?.content) ? structure.content : [];
 
 	for (const [pageIndex, chunkRects] of pageRectsMap) {
-		const page = structure.catalog.pages?.[pageIndex];
-		if (!page || !Array.isArray(page.contentRanges)) continue;
+		const pageRange = pages[pageIndex]?.contentRange;
+		walkContentRangeLeafBlocks(content, pageRange, ({ block: leafNode, ref: leafRef }) => {
+			const pageRects = leafNode.anchor?.pageRects;
+			if (!Array.isArray(pageRects)) return;
 
-		for (const range of page.contentRanges) {
-			const startTopLevel = range?.[0]?.[0];
-			const endTopLevel = range?.[1]?.[0];
-			if (!Number.isInteger(startTopLevel) || !Number.isInteger(endTopLevel)) continue;
+			for (const pr of pageRects) {
+				if (!Array.isArray(pr) || pr.length < 5) continue;
+				if (pr[0] !== pageIndex) continue;
+				const blockRect = [pr[1], pr[2], pr[3], pr[4]];
 
-			for (let i = startTopLevel; i <= endTopLevel; i++) {
-				const block = structure.content[i];
-				if (!block) continue;
-
-				walkLeafBlocks(block, [i], (leafNode, leafRef) => {
-					const pageRects = leafNode.anchor?.pageRects;
-					if (!Array.isArray(pageRects)) return;
-
-					for (const pr of pageRects) {
-						if (!Array.isArray(pr) || pr.length < 5) continue;
-						if (pr[0] !== pageIndex) continue;
-						const blockRect = [pr[1], pr[2], pr[3], pr[4]];
-
-						for (const chunkRect of chunkRects) {
-							if (intersectRects(blockRect, chunkRect)) {
-								const refKey = leafRef.join(',');
-								if (!refSet.has(refKey)) {
-									refSet.add(refKey);
-									refRanges.push(makeContentRange(leafRef, leafRef));
-								}
-								return;
+				for (const chunkRect of chunkRects) {
+					if (intersectRects(blockRect, chunkRect)) {
+						const key = refKey(leafRef);
+						if (!refSet.has(key)) {
+							refSet.add(key);
+							const range = makeLeafContentRange(leafRef);
+							if (range) {
+								refRanges.push(range);
 							}
 						}
+						return;
 					}
-				});
+				}
 			}
-		}
+		});
 	}
 
 	return refRanges;
@@ -93,32 +82,31 @@ export function getContent(structure, refRanges) {
 		return [];
 	}
 
-	// Determine which top-level block indices are included
-	const includedIndices = new Set();
+	const content = structure.content;
+	const selectedLeaves = new Map();
 	if (Array.isArray(refRanges) && refRanges.length > 0) {
 		for (const range of refRanges) {
-			const startIdx = range?.[0]?.[0];
-			const endIdx = range?.[1]?.[0];
-			if (!Number.isInteger(startIdx) || !Number.isInteger(endIdx)) continue;
-			for (let i = startIdx; i <= endIdx; i++) {
-				includedIndices.add(i);
-			}
-		}
-	} else {
-		for (let i = 0; i < structure.content.length; i++) {
-			includedIndices.add(i);
+			walkContentRangeLeafBlocks(content, range, (entry) => {
+				const key = refKey(entry.ref);
+				if (!selectedLeaves.has(key)) {
+					selectedLeaves.set(key, []);
+				}
+				selectedLeaves.get(key).push(entry);
+			});
 		}
 	}
+	const hasSelection = Array.isArray(refRanges) && refRanges.length > 0;
 
 	const segmenter = new Intl.Segmenter(undefined, { granularity: 'sentence' });
 
 	// Extract text segments from a leaf block's text nodes
-	function extractTextSegments(block) {
+	function extractTextSegments(block, ref) {
 		const segments = [];
 		const content = Array.isArray(block.content) ? block.content : [];
-		for (const node of content) {
+		for (let i = 0; i < content.length; i++) {
+			const node = content[i];
 			if (!node || typeof node.text !== 'string') continue;
-			segments.push({ text: node.text });
+			segments.push({ text: node.text, ref: [...ref, i] });
 		}
 		return segments;
 	}
@@ -130,6 +118,82 @@ export function getContent(structure, refRanges) {
 			result += seg.text;
 		}
 		return result;
+	}
+
+	function sliceSegmentsBySelection(segments, selections) {
+		if (!selections || selections.length === 0) {
+			return segments;
+		}
+		const result = [];
+		for (const segment of segments) {
+			const intervals = [];
+			for (const selection of selections) {
+				const interval = getSegmentIntervalByPoints(segment, selection.startPoint, selection.endPoint);
+				if (interval) {
+					intervals.push(interval);
+				}
+			}
+			for (const [start, end] of mergeIntervals(intervals)) {
+				result.push({
+					text: segment.text.slice(start, end),
+					ref: segment.ref,
+				});
+			}
+		}
+		return result;
+	}
+
+	function getSegmentIntervalByPoints(segment, startPoint, endPoint) {
+		let start = 0;
+		let end = segment.text.length;
+
+		if (startPoint?.ref) {
+			const cmp = compareRefs(segment.ref, startPoint.ref);
+			if (cmp < 0) {
+				return null;
+			}
+			if (cmp === 0 && Number.isInteger(startPoint.offset)) {
+				start = startPoint.offset;
+			}
+		}
+
+		if (endPoint?.ref) {
+			const cmp = compareRefs(segment.ref, endPoint.ref);
+			if (cmp > 0) {
+				return null;
+			}
+			if (cmp === 0) {
+				if (!Number.isInteger(endPoint.offset)) {
+					return null;
+				}
+				end = endPoint.offset;
+			}
+		}
+
+		start = Math.max(0, Math.min(start, segment.text.length));
+		end = Math.max(0, Math.min(end, segment.text.length));
+		if (end <= start) {
+			return null;
+		}
+		return [start, end];
+	}
+
+	function mergeIntervals(intervals) {
+		if (!intervals.length) {
+			return [];
+		}
+		intervals.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+		const merged = [];
+		for (const interval of intervals) {
+			const last = merged[merged.length - 1];
+			if (!last || interval[0] > last[1]) {
+				merged.push([...interval]);
+			}
+			else {
+				last[1] = Math.max(last[1], interval[1]);
+			}
+		}
+		return merged;
 	}
 
 	// Slice text segments by character offset range [start, end)
@@ -149,10 +213,10 @@ export function getContent(structure, refRanges) {
 	}
 
 	// Process a leaf block: extract text, segment sentences, generate JSON output
-	function processLeafBlock(block, ref) {
+	function processLeafBlock(block, ref, selections) {
 		const type = block.type || 'block';
 		const refPath = ref.join('.');
-		const segments = extractTextSegments(block);
+		const segments = sliceSegmentsBySelection(extractTextSegments(block, ref), selections);
 		const plainText = segments.map(s => s.text).join('');
 		const trimmedPlainText = plainText.trim();
 
@@ -182,13 +246,17 @@ export function getContent(structure, refRanges) {
 	// Process a block recursively
 	function processBlock(block, ref) {
 		if (!block) return '';
+		if (block.flowClass === 'excluded') return null;
 
 		const content = Array.isArray(block.content) ? block.content : [];
 		const hasChildBlock = content.some(child => child && typeof child.text !== 'string');
 
 		if (!hasChildBlock) {
-			// Leaf block
-			return processLeafBlock(block, ref);
+			const selections = hasSelection ? selectedLeaves.get(refKey(ref)) : null;
+			if (hasSelection && !selections) {
+				return null;
+			}
+			return processLeafBlock(block, ref, selections);
 		}
 
 		// Container block (e.g. list containing listitems)
@@ -200,19 +268,22 @@ export function getContent(structure, refRanges) {
 		for (let i = 0; i < content.length; i++) {
 			const child = content[i];
 			if (!child || typeof child.text === 'string') continue;
-			result.content.push(processBlock(child, [...ref, i]));
+			const childResult = processBlock(child, [...ref, i]);
+			if (childResult) {
+				result.content.push(childResult);
+			}
 		}
-		return result;
+		return result.content.length ? result : null;
 	}
 
 	const parts = [];
-	const sortedIndices = [...includedIndices].sort((a, b) => a - b);
 
-	for (const i of sortedIndices) {
-		const block = structure.content[i];
-		if (!block) continue;
-		if (block.artifact) break;
-		parts.push(processBlock(block, [i]));
+	for (let i = 0; i < content.length; i++) {
+		const block = content[i];
+		const part = processBlock(block, [i]);
+		if (part) {
+			parts.push(part);
+		}
 	}
 
 	return parts;

@@ -6,15 +6,13 @@ import { discoverFixtures, isUpdateMode, readExpected, writeExpected } from './h
 const fixtures = discoverFixtures();
 
 describe('getFulltextFromStructuredText', () => {
-	it('respects nested content ranges and terminal text offsets', () => {
+	it('uses half-open page content ranges over top-level blocks', () => {
 		const structure = {
 			catalog: {
-				pages: [{
-					contentRanges: [
-						[[0, 0, 2], [0, 0, 4]],
-						[[1, 0, 0, 1], [1, 1, 0, 2]],
-					],
-				}],
+				pages: [
+					{ contentRange: [[0], [2]] },
+					{ contentRange: [[2], [3]] },
+				],
 			},
 			content: [
 				{
@@ -35,18 +33,190 @@ describe('getFulltextFromStructuredText', () => {
 			],
 		};
 
-		assert.equal(getFulltextFromStructuredText(structure, [0]), 'cde\n\nello\nwor');
+		assert.equal(getFulltextFromStructuredText(structure, [0]), 'abcdef\n\nhello\nworld');
+		assert.equal(getFulltextFromStructuredText(structure, [1]), 'outside');
+		assert.equal(getFulltextFromStructuredText(structure, [1, 0]), 'outside\n\nabcdef\n\nhello\nworld');
 	});
 
-	it('deduplicates overlapping terminal text spans without widening to whole blocks', () => {
+	it('emits continuation chains once when all parts are in the selected pages', () => {
 		const structure = {
 			catalog: {
-				pages: [{
-					contentRanges: [
-						[[0, 0, 0], [0, 0, 3]],
-						[[0, 0, 2], [0, 0, 5]],
+				pages: [{ contentRange: [[0], [2]] }],
+			},
+			content: [
+				{
+					type: 'paragraph',
+					nextPart: [1],
+					content: [{ text: 'abcdef' }],
+				},
+				{
+					type: 'paragraph',
+					previousPart: [0],
+					content: [{ text: 'ghij' }],
+				},
+			],
+		};
+
+		assert.equal(getFulltextFromStructuredText(structure, [0]), 'abcdef ghij');
+	});
+
+	it('keeps page-split slices of a block together in part chains', () => {
+		const structure = {
+			catalog: {
+				pages: [
+					{ contentRange: [[0], [0, 0, 11]] },
+					{ contentRange: [[0, 0, 11], [2]] },
+				],
+			},
+			content: [
+				{
+					type: 'paragraph',
+					nextPart: [1],
+					content: [{ text: 'first-half second-half' }],
+				},
+				{
+					type: 'paragraph',
+					previousPart: [0],
+					content: [{ text: 'continuation.' }],
+				},
+			],
+		};
+
+		assert.equal(getFulltextFromStructuredText(structure, [0, 1]), 'first-half second-half continuation.');
+		assert.equal(getFulltextFromStructuredText(structure, [0]), 'first-half');
+		assert.equal(getFulltextFromStructuredText(structure, [1]), 'second-half continuation.');
+	});
+
+	it('drops hard hyphen at explicit part boundaries', () => {
+		const structure = {
+			catalog: {
+				pages: [{ contentRange: [[0], [2]] }],
+			},
+			content: [
+				{
+					type: 'paragraph',
+					nextPart: [1],
+					content: [{ text: 'hyphen-' }],
+				},
+				{
+					type: 'paragraph',
+					previousPart: [0],
+					content: [{ text: 'ated' }],
+				},
+			],
+		};
+
+		assert.equal(getFulltextFromStructuredText(structure, [0]), 'hyphenated');
+	});
+
+	it('keeps hard hyphen when the next part is not a lowercase continuation', () => {
+		const structure = {
+			catalog: {
+				pages: [{ contentRange: [[0], [2]] }],
+			},
+			content: [
+				{
+					type: 'paragraph',
+					nextPart: [1],
+					content: [{ text: 'Object-' }],
+				},
+				{
+					type: 'paragraph',
+					previousPart: [0],
+					content: [{ text: 'Shape' }],
+				},
+			],
+		};
+
+		assert.equal(getFulltextFromStructuredText(structure, [0]), 'Object-Shape');
+	});
+
+	it('treats a nested end boundary as before that child', () => {
+		const structure = {
+			catalog: {
+				pages: [
+					{ contentRange: [[0], [1, 0]] },
+					{ contentRange: [[1, 0], [2]] },
+				],
+			},
+			content: [
+				{
+					type: 'paragraph',
+					content: [{ text: 'before list' }],
+				},
+				{
+					type: 'list',
+					content: [
+						{ type: 'listitem', content: [{ text: 'first item' }] },
+						{ type: 'listitem', content: [{ text: 'second item' }] },
 					],
-				}],
+				},
+			],
+		};
+
+		assert.equal(getFulltextFromStructuredText(structure, [0]), 'before list');
+		assert.equal(getFulltextFromStructuredText(structure, [1]), 'first item\nsecond item');
+	});
+
+	it('keeps separators when selected pages split sibling children of one container', () => {
+		const structure = {
+			catalog: {
+				pages: [
+					{ contentRange: [[0, 0], [0, 1]] },
+					{ contentRange: [[0, 1], [0, 2]] },
+				],
+			},
+			content: [
+				{
+					type: 'list',
+					content: [
+						{ type: 'listitem', content: [{ text: 'first item' }] },
+						{ type: 'listitem', content: [{ text: 'second item' }] },
+					],
+				},
+			],
+		};
+
+		assert.equal(getFulltextFromStructuredText(structure, [0]), 'first item');
+		assert.equal(getFulltextFromStructuredText(structure, [1]), 'second item');
+		assert.equal(getFulltextFromStructuredText(structure, [0, 1]), 'first item\nsecond item');
+	});
+
+	it('emits nested continuation chains once', () => {
+		const structure = {
+			catalog: {
+				pages: [{ contentRange: [[0], [2]] }],
+			},
+			content: [
+				{
+					type: 'list',
+					content: [{
+						type: 'listitem',
+						nextPart: [1, 0],
+						content: [{ text: 'programming' }],
+					}],
+				},
+				{
+					type: 'list',
+					content: [{
+						type: 'listitem',
+						previousPart: [0, 0],
+						content: [{ text: 'and is used' }],
+					}],
+				},
+			],
+		};
+
+		assert.equal(getFulltextFromStructuredText(structure, [0]), 'programming and is used');
+	});
+
+	it('respects text-offset page boundaries', () => {
+		const structure = {
+			catalog: {
+				pages: [
+					{ contentRange: [[0, 0, 0], [0, 0, 3]] },
+					{ contentRange: [[0, 0, 3], [0, 0, 6]] },
+				],
 			},
 			content: [{
 				type: 'paragraph',
@@ -54,7 +224,47 @@ describe('getFulltextFromStructuredText', () => {
 			}],
 		};
 
-		assert.equal(getFulltextFromStructuredText(structure, [0]), 'abcdef');
+		assert.equal(getFulltextFromStructuredText(structure, [0]), 'abc');
+		assert.equal(getFulltextFromStructuredText(structure, [1]), 'def');
+		assert.equal(getFulltextFromStructuredText(structure, [0, 1]), 'abcdef');
+		assert.equal(getFulltextFromStructuredText(structure, [1, 0]), 'defabc');
+	});
+
+	it('respects text-offset boundaries across multiple blocks', () => {
+		const structure = {
+			catalog: {
+				pages: [
+					{ contentRange: [[0, 0, 1], [2, 0, 2]] },
+				],
+			},
+			content: [
+				{ type: 'paragraph', content: [{ text: 'abc' }] },
+				{ type: 'paragraph', content: [{ text: 'def' }] },
+				{ type: 'paragraph', content: [{ text: 'ghi' }] },
+			],
+		};
+
+		assert.equal(getFulltextFromStructuredText(structure, [0]), 'bc\n\ndef\n\ngh');
+	});
+
+	it('treats equal boundaries as known empty pages', () => {
+		const structure = {
+			catalog: {
+				pages: [
+					{ contentRange: [[0], [0]] },
+					{ contentRange: [[0], [1]] },
+					{ contentRange: [[1], [1]] },
+				],
+			},
+			content: [{
+				type: 'paragraph',
+				content: [{ text: 'visible' }],
+			}],
+		};
+
+		assert.equal(getFulltextFromStructuredText(structure, [0]), '');
+		assert.equal(getFulltextFromStructuredText(structure, [1]), 'visible');
+		assert.equal(getFulltextFromStructuredText(structure, [2]), '');
 	});
 
 	for (const { format, name, path, data } of fixtures) {

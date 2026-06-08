@@ -5,116 +5,120 @@
   },
   {
     "title": "Abstract",
-    "startRef": "7"
+    "startRef": "11"
   },
   {
     "title": "1. Introduction",
-    "startRef": "12"
+    "startRef": "16"
   },
   {
     "title": "2. Overview: Example Tracing Run",
-    "startRef": "33"
+    "startRef": "40"
   },
   {
     "title": "3. Trace Trees",
-    "startRef": "49",
+    "startRef": "55",
     "children": [
       {
+        "title": "Type specialization.",
+        "startRef": "68"
+      },
+      {
         "title": "3.1 Traces",
-        "startRef": "51"
+        "startRef": "57"
       },
       {
         "title": "3.2 Trace Trees",
-        "startRef": "72"
+        "startRef": "78"
       },
       {
         "title": "3.3 Blacklisting",
-        "startRef": "85"
+        "startRef": "91"
       }
     ]
   },
   {
     "title": "4. Nested Trace Tree Formation",
-    "startRef": "93",
+    "startRef": "99",
     "children": [
       {
         "title": "4.1 Nesting Algorithm",
-        "startRef": "105"
+        "startRef": "113"
       },
       {
         "title": "4.2 Blacklisting with Nesting",
-        "startRef": "114"
+        "startRef": "123"
       }
     ]
   },
   {
     "title": "5. Trace Tree Optimization",
-    "startRef": "118",
+    "startRef": "127",
     "children": [
       {
         "title": "5.1 Optimizations",
-        "startRef": "120"
+        "startRef": "129"
       }
     ]
   },
   {
     "title": "6. Implementation",
-    "startRef": "135",
+    "startRef": "146",
     "children": [
       {
         "title": "6.1 Calling Compiled Traces",
-        "startRef": "141"
-      },
-      {
-        "title": "5.2 Register Allocation",
-        "startRef": "129"
-      },
-      {
-        "title": "6.2 Trace Stitching",
-        "startRef": "147"
-      },
-      {
-        "title": "6.3 Trace Recording",
         "startRef": "152"
       },
       {
-        "title": "6.4 Preemption",
+        "title": "5.2 Register Allocation",
+        "startRef": "138"
+      },
+      {
+        "title": "6.2 Trace Stitching",
+        "startRef": "158"
+      },
+      {
+        "title": "6.3 Trace Recording",
         "startRef": "163"
       },
       {
+        "title": "6.4 Preemption",
+        "startRef": "170"
+      },
+      {
         "title": "6.5 Calling External Functions",
-        "startRef": "167"
+        "startRef": "174"
       }
     ]
   },
   {
     "title": "7. Evaluation",
-    "startRef": "183",
+    "startRef": "191",
     "children": [
       {
         "title": "6.6 Correctness",
-        "startRef": "178"
+        "startRef": "185"
       }
     ]
   },
   {
     "title": "8. Related Work",
-    "startRef": "205"
+    "startRef": "214"
   },
   {
     "title": "9. Conclusions",
-    "startRef": "227"
+    "startRef": "237"
   },
   {
     "title": "10. Future Work",
-    "startRef": "230"
+    "startRef": "240"
   },
   {
     "title": "Acknowledgments",
-    "startRef": "233"
+    "startRef": "243"
   },
   {
     "title": "References",
-    "startRef": "236"
+    "startRef": "247"
   }
 ]

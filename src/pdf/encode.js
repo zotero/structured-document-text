@@ -5,6 +5,7 @@ import {
 	EPS,
 	isVertical,
 } from './constants.js';
+import { stringifyTextMap } from './text-map.js';
 
 // ───────────────────────────── Style Helpers ─────────────────────────────
 
@@ -34,59 +35,6 @@ function sameLineRect(a, b, axisDir) {
 		: Math.abs(a[1] - b[1]) <= EPS && Math.abs(a[3] - b[3]) <= EPS;
 }
 
-// ───────────────────────────── Run Optimization ─────────────────────────────
-
-function roundShortest(value, maxError) {
-	if (!Number.isFinite(value)) return value;
-	for (let d = 0; d <= 6; d++) {
-		const f = 10 ** d;
-		const rounded = Math.round(value * f) / f;
-		if (Math.abs(rounded - value) <= maxError + 1e-9) return rounded;
-	}
-	return value;
-}
-
-function optimizeRun(run, maxError = 0.25) {
-	if (!run || run.length < 6) return run;
-
-	const [header, pageIndex, minX, minY, maxX, maxY, ...widths] = run;
-	const result = [
-		header,
-		pageIndex,
-		roundShortest(minX, maxError),
-		roundShortest(minY, maxError),
-		roundShortest(maxX, maxError),
-		roundShortest(maxY, maxError),
-	];
-
-	let cumErr = result[2] - minX;
-
-	for (const w of widths) {
-		if (Array.isArray(w)) {
-			const [delta, width] = w;
-			const targetDelta = delta - cumErr;
-			const roundedDelta = roundShortest(targetDelta, maxError);
-			cumErr = roundedDelta - targetDelta;
-
-			let targetWidth = width - cumErr;
-			if (targetWidth < 0) { cumErr += targetWidth; targetWidth = 0; }
-			const roundedWidth = roundShortest(targetWidth, maxError);
-			cumErr = roundedWidth - targetWidth;
-
-			result.push([roundedDelta, roundedWidth]);
-		} else {
-			let targetWidth = w - cumErr;
-			if (targetWidth < 0) { cumErr += targetWidth; targetWidth = 0; }
-			const roundedWidth = roundShortest(targetWidth, maxError);
-			cumErr = roundedWidth - targetWidth;
-
-			result.push(roundedWidth);
-		}
-	}
-
-	return result;
-}
-
 // ───────────────────────────── Char → TextNode ─────────────────────────────
 
 // Some PDFs express diacritics like the umlaut on "ï" as clusters like " ̈"
@@ -100,6 +48,18 @@ function optimizeRun(run, maxError = 0.25) {
 // and attaches to its intended base. Flags are shifted onto the mark so the
 // virtual space, if any, lands after the full cluster.
 function reorderLeadingSpaceClusters(chars) {
+	let needsReorder = false;
+	for (let i = 0; i < chars.length; i++) {
+		const c = chars[i].c;
+		if (c.length > 1 && c[0] === ' ') {
+			needsReorder = true;
+			break;
+		}
+	}
+	if (!needsReorder) {
+		return chars;
+	}
+
 	const out = [];
 	for (let i = 0; i < chars.length; i++) {
 		const ch = chars[i];
@@ -170,10 +130,7 @@ export function charsToTextNodes(pageIndex, chars) {
 		// Single char optimization: no widths needed, bbox defines position
 		const finalWidths = widths.length === 1 && !Array.isArray(widths[0]) ? [] : widths;
 
-		const original = [header, pageIndex, minX, minY, maxX, maxY, ...finalWidths];
-		const optimized = optimizeRun(original);
-
-		node.runs.push(optimized);
+		node.runs.push([header, pageIndex, minX, minY, maxX, maxY, ...finalWidths]);
 	};
 
 	const flushNode = () => {
@@ -182,7 +139,7 @@ export function charsToTextNodes(pageIndex, chars) {
 
 		const text = node.textParts.join('');
 		const style = node.style;
-		const anchor = node.runs.length ? { textMap: JSON.stringify(node.runs) } : null;
+		const anchor = node.runs.length ? { textMap: stringifyTextMap(node.runs) } : null;
 
 		const leadingMatch = text.match(/^ +/);
 		const trailingMatch = text.match(/ +$/);

@@ -1,13 +1,11 @@
 import { getNestedBlockPlainText } from './text.js';
 
-/**
- * Flatten outline hierarchy into an ordered list of { blockIndex, path }.
- */
 function flattenOutline(items, ancestors) {
 	const result = [];
 	if (!Array.isArray(items)) return result;
 	for (const item of items) {
-		const blockIndex = Array.isArray(item.ref) && item.ref.length > 0 ? item.ref[0] : null;
+		const blockIndex =
+			Array.isArray(item.ref) && item.ref.length > 0 ? item.ref[0] : null;
 		const path = [...ancestors, item.title];
 		if (Number.isInteger(blockIndex) && blockIndex >= 0) {
 			result.push({ blockIndex, path });
@@ -19,9 +17,6 @@ function flattenOutline(items, ancestors) {
 	return result;
 }
 
-/**
- * Collect anchor.pageRects from a block into a map of pageIndex -> rects.
- */
 function collectBlockPageRects(block, map) {
 	const pageRects = block?.anchor?.pageRects;
 	if (!Array.isArray(pageRects)) return;
@@ -37,9 +32,6 @@ function collectBlockPageRects(block, map) {
 	}
 }
 
-/**
- * Count the number of leaf blocks inside a block (accounting for nested content like lists).
- */
 function countLeafBlocks(block) {
 	if (!block) return 0;
 	if (!Array.isArray(block.content) || block.content.length === 0) return 1;
@@ -52,31 +44,30 @@ function countLeafBlocks(block) {
 
 const MIN_CHUNK_TEXT_LENGTH = 30;
 
-/**
- * Get the next chunk starting at startBlockIndex.
- * Each chunk corresponds to a section between consecutive outline headings.
- * Returns null when there are no more chunks.
- */
 export function getNextChunk(structure, startBlockIndex) {
 	const content = structure?.content;
-	if (!Array.isArray(content) || startBlockIndex < 0 || startBlockIndex >= content.length) {
+	if (
+		!Array.isArray(content) ||
+		startBlockIndex < 0 ||
+		startBlockIndex >= content.length
+	) {
 		return null;
 	}
 
-	// Flatten outline to get heading block indexes and their hierarchy paths
 	const headings = flattenOutline(structure.catalog.outline, []);
 	headings.sort((a, b) => a.blockIndex - b.blockIndex);
 
 	while (startBlockIndex < content.length) {
-		// Skip leading artifact blocks
-		while (startBlockIndex < content.length && content[startBlockIndex]?.artifact) {
+		while (
+			startBlockIndex < content.length &&
+			content[startBlockIndex]?.flowClass === 'excluded'
+		) {
 			startBlockIndex++;
 		}
 		if (startBlockIndex >= content.length) {
 			return null;
 		}
 
-		// Find section end: the block before the next heading after startBlockIndex
 		let endBlockIndex = content.length - 1;
 		for (const h of headings) {
 			if (h.blockIndex > startBlockIndex) {
@@ -85,14 +76,17 @@ export function getNextChunk(structure, startBlockIndex) {
 			}
 		}
 
-		// Trim trailing artifact/empty blocks from end of chunk
 		while (endBlockIndex > startBlockIndex) {
 			const block = content[endBlockIndex];
-			if (block && !block.artifact && getNestedBlockPlainText(block)) break;
+			if (
+				block &&
+				block.flowClass !== 'excluded' &&
+				getNestedBlockPlainText(block)
+			)
+				break;
 			endBlockIndex--;
 		}
 
-		// Determine outline path from the most recent heading at or before startBlockIndex
 		let outlinePath = '';
 		for (let i = headings.length - 1; i >= 0; i--) {
 			if (headings[i].blockIndex <= startBlockIndex) {
@@ -101,7 +95,6 @@ export function getNextChunk(structure, startBlockIndex) {
 			}
 		}
 
-		// Determine if startBlockIndex is a heading block itself
 		let contentStartIndex = startBlockIndex;
 		for (const h of headings) {
 			if (h.blockIndex === startBlockIndex) {
@@ -110,10 +103,8 @@ export function getNextChunk(structure, startBlockIndex) {
 			}
 		}
 
-		// Collect text and page rects from blocks in this section (excluding heading)
 		const textParts = [];
 		const pageRectsMap = new Map();
-		// Include heading block's page rects in the chunk
 		if (contentStartIndex !== startBlockIndex) {
 			collectBlockPageRects(content[startBlockIndex], pageRectsMap);
 		}
@@ -121,7 +112,7 @@ export function getNextChunk(structure, startBlockIndex) {
 
 		for (let i = contentStartIndex; i <= endBlockIndex; i++) {
 			const block = content[i];
-			if (!block || block.artifact) continue;
+			if (!block || block.flowClass === 'excluded') continue;
 
 			const blockText = getNestedBlockPlainText(block);
 			if (blockText) {
@@ -134,7 +125,6 @@ export function getNextChunk(structure, startBlockIndex) {
 
 		const text = textParts.join('\n');
 
-		// Skip empty or too-short chunks
 		if (!text || text.length < MIN_CHUNK_TEXT_LENGTH) {
 			startBlockIndex = endBlockIndex + 1;
 			continue;
@@ -155,7 +145,7 @@ export function getNextChunk(structure, startBlockIndex) {
 			leafBlockCount,
 			outlinePath,
 			text,
-			pageRects
+			pageRects,
 		};
 	}
 	return null;

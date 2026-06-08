@@ -1,5 +1,5 @@
 /**
- * Block transformations: attribute application, reordering, and merging.
+ * Block transformations: attribute application.
  */
 
 import {
@@ -9,24 +9,14 @@ import {
 	isVertical,
 } from './constants.js';
 import { parseTextMap, reconstructCharPositions } from './decode.js';
-import { canMergeTextNodes, mergeSequentialTextNodes } from './text-node.js';
-import { getBlockByRef, getContentRangeFromBlocks } from './block.js';
-import { isWhitespaceChar, sameRef } from './utils.js';
+import { getBlockByRef } from './block.js';
+import { isWhitespaceChar } from './utils.js';
 import {
-	makeContentRange,
 	setContentRangeEnd,
 	setContentRangeStart,
 	splitContentRange,
 } from '../range.js';
-
-function mergePageRects(blocks) {
-	const allRects = [];
-	for (const block of blocks) {
-		const rects = block?.anchor?.pageRects;
-		if (Array.isArray(rects)) allRects.push(...rects);
-	}
-	return allRects.length > 0 ? allRects : null;
-}
+import { stringifyTextMap } from './text-map.js';
 
 function sliceTextMap(textMap, text, startOffset, endOffset) {
 	const runs = parseTextMap(textMap);
@@ -107,7 +97,7 @@ function sliceTextMap(textMap, text, startOffset, endOffset) {
 		charIndex = runEnd;
 	}
 
-	return newRuns.length ? JSON.stringify(newRuns) : null;
+	return newRuns.length ? stringifyTextMap(newRuns) : null;
 }
 
 /**
@@ -119,155 +109,7 @@ export function applyTextAttributes(structure, blockRef, offsetStart, offsetEnd,
 		return null;
 	}
 
-	const startsWithRef = (ref, prefix) => {
-		if (!Array.isArray(ref) || !Array.isArray(prefix) || prefix.length > ref.length) {
-			return false;
-		}
-		for (let i = 0; i < prefix.length; i++) {
-			if (ref[i] !== prefix[i]) {
-				return false;
-			}
-		}
-		return true;
-	};
-
-	const walkTextNodesWithRefs = (node, path, visitor) => {
-		if (!node || typeof node !== 'object') {
-			return true;
-		}
-		if (typeof node.text === 'string') {
-			return visitor(node, path) !== false;
-		}
-		if (Array.isArray(node.content)) {
-			for (let i = 0; i < node.content.length; i++) {
-				const child = node.content[i];
-				const shouldContinue = walkTextNodesWithRefs(child, [...path, i], visitor);
-				if (!shouldContinue) {
-					return false;
-				}
-			}
-		}
-		return true;
-	};
-
-	const getAbsoluteOffsetForRef = (root, rootRef, targetRef, targetOffset, isEnd) => {
-		if (!Array.isArray(targetRef) || !startsWithRef(targetRef, rootRef)) {
-			return null;
-		}
-		const localRef = targetRef.slice(rootRef.length);
-		let absolute = null;
-		let currentOffset = 0;
-		let firstMatch = null;
-		let lastMatch = null;
-
-		const clampOffset = (offset, length, endBias) => {
-			if (!Number.isInteger(offset)) {
-				return endBias ? Math.max(0, length - 1) : 0;
-			}
-			if (length <= 0) {
-				return 0;
-			}
-			return Math.max(0, Math.min(offset, length - 1));
-		};
-
-		walkTextNodesWithRefs(root, [], (node, path) => {
-			const len = node.text.length;
-			const isExact = localRef.length > 0 && sameRef(path, localRef);
-			const isMatch = isExact || localRef.length === 0 || startsWithRef(path, localRef);
-			if (isMatch) {
-				const offset = clampOffset(targetOffset, len, isEnd);
-				const abs = currentOffset + offset;
-				if (isExact) {
-					absolute = abs;
-					return false;
-				}
-				if (firstMatch === null) {
-					firstMatch = abs;
-				}
-				lastMatch = abs;
-			}
-			currentOffset += len;
-			return true;
-		});
-
-		if (absolute !== null) {
-			return absolute;
-		}
-		return isEnd ? lastMatch : firstMatch;
-	};
-
-	const getRefForAbsoluteOffset = (root, rootRef, absOffset) => {
-		if (!Number.isInteger(absOffset)) {
-			return null;
-		}
-		let currentOffset = 0;
-		let found = null;
-		let lastRef = null;
-		let lastLen = 0;
-
-		walkTextNodesWithRefs(root, [], (node, path) => {
-			const len = node.text.length;
-			lastRef = [...rootRef, ...path];
-			lastLen = len;
-
-			if (len > 0) {
-				if (absOffset <= currentOffset + len - 1) {
-					found = {
-						ref: [...rootRef, ...path],
-						offset: absOffset - currentOffset
-					};
-					return false;
-				}
-				currentOffset += len;
-			}
-			return true;
-		});
-
-		if (found) {
-			return found;
-		}
-
-		if (!lastRef) {
-			return null;
-		}
-
-		const clamped = lastLen > 0 ? Math.max(0, Math.min(absOffset - (currentOffset - lastLen), lastLen - 1)) : 0;
-		return { ref: lastRef, offset: clamped };
-	};
-
-	const rangeUpdates = [];
-	if (Array.isArray(structure?.catalog?.pages)) {
-		for (const page of structure.catalog.pages) {
-			if (!page || !Array.isArray(page.contentRanges)) {
-				continue;
-			}
-			for (const range of page.contentRanges) {
-				const { start, end } = splitContentRange(range, structure.content);
-				if (start.ref && startsWithRef(start.ref, blockRef)) {
-					const absOffset = getAbsoluteOffsetForRef(block, blockRef, start.ref, start.offset, false);
-					if (absOffset !== null) {
-						rangeUpdates.push({
-							range,
-							point: 'start',
-							absOffset,
-							hasOffset: Number.isInteger(start.offset)
-						});
-					}
-				}
-				if (end.ref && startsWithRef(end.ref, blockRef)) {
-					const absOffset = getAbsoluteOffsetForRef(block, blockRef, end.ref, end.offset, true);
-					if (absOffset !== null) {
-						rangeUpdates.push({
-							range,
-							point: 'end',
-							absOffset,
-							hasOffset: Number.isInteger(end.offset)
-						});
-					}
-				}
-			}
-		}
-	}
+	const rangeUpdates = collectContentRangeBoundaryUpdates(structure, block, blockRef);
 
 	// Treat offsetEnd as inclusive; normalize to a sane range.
 	if (!Number.isInteger(offsetStart) || !Number.isInteger(offsetEnd)) {
@@ -417,693 +259,182 @@ export function applyTextAttributes(structure, blockRef, offsetStart, offsetEnd,
 		Object.assign(block, updatedBlock);
 	}
 
-	if (didSplit && rangeUpdates.length > 0) {
-		for (const update of rangeUpdates) {
-			const mapped = getRefForAbsoluteOffset(block, blockRef, update.absOffset);
-			if (!mapped) {
-				continue;
-			}
-			if (update.point === 'start') {
-				setContentRangeStart(update.range, mapped.ref, update.hasOffset ? mapped.offset : undefined);
-			}
-			else {
-				setContentRangeEnd(update.range, mapped.ref, update.hasOffset ? mapped.offset : undefined);
-			}
-		}
+	if (didSplit) {
+		applyContentRangeBoundaryUpdates(block, blockRef, rangeUpdates);
 	}
 
 	return targetTextNodeRef;
 }
 
-/**
- * Move artifact blocks to end of content, updating refs.
- */
-export function pushArtifactsToTheEnd(structure) {
-	if (!structure) {
-		return structure;
+function collectContentRangeBoundaryUpdates(structure, block, blockRef) {
+	if (!Array.isArray(structure?.catalog?.pages) || !Array.isArray(blockRef)) {
+		return [];
 	}
 
-	const blocks = structure.content;
-
-	if (!Array.isArray(blocks) || blocks.length === 0) {
-		return structure;
-	}
-	const originalBlocks = [...blocks];
-
-	const nonArtifacts = [];
-	const artifacts = [];
-
-	for (let i = 0; i < blocks.length; i++) {
-		const block = blocks[i];
-		if (block && block.artifact) {
-			artifacts.push({ block, index: i });
-		} else {
-			nonArtifacts.push({ block, index: i });
+	const updates = [];
+	for (const page of structure.catalog.pages) {
+		if (!Array.isArray(page?.contentRange)) {
+			continue;
 		}
-	}
-
-	if (artifacts.length === 0) {
-		return structure;
-	}
-
-	const indexMap = new Map();
-	let nextIndex = 0;
-	const reordered = [];
-
-	for (const item of nonArtifacts) {
-		indexMap.set(item.index, nextIndex++);
-		reordered.push(item.block);
-	}
-
-	for (const item of artifacts) {
-		indexMap.set(item.index, nextIndex++);
-		reordered.push(item.block);
-	}
-
-	blocks.length = 0;
-	blocks.push(...reordered);
-
-	const updateRefPath = (ref) => {
-		if (!Array.isArray(ref) || ref.length === 0) {
-			return;
+		let parts;
+		try {
+			parts = splitContentRange(page.contentRange, structure.content);
 		}
-		const mapped = indexMap.get(ref[0]);
-		if (typeof mapped === 'number') {
-			ref[0] = mapped;
+		catch (_) {
+			continue;
 		}
-	};
-
-	const updateRefsArray = (refs) => {
-		if (!Array.isArray(refs)) {
-			return;
-		}
-		for (const ref of refs) {
-			updateRefPath(ref);
-		}
-	};
-
-	const updateNodeRefs = (node) => {
-		if (!node || typeof node !== 'object') {
-			return;
-		}
-
-		if (Array.isArray(node.ref)) {
-			updateRefPath(node.ref);
-		}
-
-		updateRefsArray(node.refs);
-		updateRefsArray(node.backRefs);
-
-		if (Array.isArray(node.content)) {
-			for (const child of node.content) {
-				updateNodeRefs(child);
-			}
-		}
-
-		if (Array.isArray(node.children)) {
-			for (const child of node.children) {
-				updateNodeRefs(child);
-			}
-		}
-	};
-
-	for (const block of blocks) {
-		updateNodeRefs(block);
-	}
-
-	const copyRef = (ref) => (Array.isArray(ref) ? [...ref] : null);
-
-	if (structure && Array.isArray(structure.catalog.pages)) {
-		for (const page of structure.catalog.pages) {
-			if (!page || !Array.isArray(page.contentRanges)) {
+		for (const point of ['start', 'end']) {
+			const boundary = parts[point];
+			if (!Array.isArray(boundary?.ref) || !startsWithRef(boundary.ref, blockRef)) {
 				continue;
 			}
-
-			const updatedRanges = [];
-
-			for (const range of page.contentRanges) {
-				const { start, end } = splitContentRange(range, originalBlocks);
-				const startRef = start.ref;
-				const endRef = end.ref;
-				const startIndex = Array.isArray(startRef) ? startRef[0] : null;
-				const endIndex = Array.isArray(endRef) ? endRef[0] : null;
-
-				if (!Number.isInteger(startIndex) || !Number.isInteger(endIndex) || startIndex > endIndex) {
-					if (startRef) {
-						updateRefPath(startRef);
-					}
-					if (endRef) {
-						updateRefPath(endRef);
-					}
-					if (Array.isArray(startRef) && Array.isArray(endRef)) {
-						updatedRanges.push(makeContentRange(startRef, endRef, start.offset, end.offset));
-					}
-					continue;
-				}
-
-				const expanded = [];
-				for (let i = startIndex; i <= endIndex; i++) {
-					expanded.push({
-						oldIndex: i,
-						startRef: i === startIndex ? startRef : null,
-						endRef: i === endIndex ? endRef : null,
-						startOffset: i === startIndex ? start.offset : undefined,
-						endOffset: i === endIndex ? end.offset : undefined
-					});
-				}
-
-				let runStart = 0;
-				for (let i = 1; i <= expanded.length; i++) {
-					const prev = expanded[i - 1];
-					const prevNewIndex = indexMap.get(prev.oldIndex);
-					const curr = expanded[i];
-					const currNewIndex = curr ? indexMap.get(curr.oldIndex) : null;
-					const isConsecutive = curr && prevNewIndex + 1 === currNewIndex;
-
-					if (!curr || !isConsecutive) {
-						const first = expanded[runStart];
-						const last = expanded[i - 1];
-						const startNewIndex = indexMap.get(first.oldIndex);
-						const endNewIndex = indexMap.get(last.oldIndex);
-						const autoRange = getContentRangeFromBlocks(blocks, startNewIndex, endNewIndex);
-						const autoRangeParts = splitContentRange(autoRange, blocks);
-
-						let rangeStartRef = first.startRef ? copyRef(first.startRef) : autoRangeParts.start.ref;
-						let rangeEndRef = last.endRef ? copyRef(last.endRef) : autoRangeParts.end.ref;
-
-						if (Array.isArray(rangeStartRef) && Number.isInteger(startNewIndex)) {
-							rangeStartRef[0] = startNewIndex;
-						}
-						if (Array.isArray(rangeEndRef) && Number.isInteger(endNewIndex)) {
-							rangeEndRef[0] = endNewIndex;
-						}
-
-						if (Array.isArray(rangeStartRef) && Array.isArray(rangeEndRef)) {
-							updatedRanges.push(makeContentRange(
-								rangeStartRef,
-								rangeEndRef,
-								first.startOffset,
-								last.endOffset,
-							));
-						}
-
-						runStart = i;
-					}
-				}
+			if (sameRef(boundary.ref, blockRef)) {
+				continue;
 			}
-
-			page.contentRanges = updatedRanges;
+			const absoluteOffset = getAbsoluteOffsetForBoundary(block, blockRef, boundary.ref, boundary.offset);
+			if (!Number.isInteger(absoluteOffset)) {
+				continue;
+			}
+			updates.push({
+				range: page.contentRange,
+				point,
+				absoluteOffset,
+				hasOffset: Number.isInteger(boundary.offset),
+			});
 		}
 	}
-
-	return structure;
+	return updates;
 }
 
-/**
- * Merge multiple blocks into one, updating refs.
- */
-export function mergeBlocks(structure, blockIndexes) {
-	if (!structure || !Array.isArray(structure.content) || structure.content.length === 0) {
-		return structure;
-	}
-
-	if (!Array.isArray(blockIndexes) || blockIndexes.length === 0) {
-		return structure;
-	}
-
-	const originalContent = structure.content;
-	const maxIndex = originalContent.length - 1;
-
-	const groups = [];
-	const used = new Set();
-
-	for (const group of blockIndexes) {
-		if (!Array.isArray(group)) {
+function applyContentRangeBoundaryUpdates(block, blockRef, updates) {
+	for (const update of updates) {
+		const mapped = getBoundaryForAbsoluteOffset(block, blockRef, update.absoluteOffset, update.hasOffset);
+		if (!mapped) {
 			continue;
 		}
-
-		const unique = [];
-		const seen = new Set();
-		for (const index of group) {
-			if (!Number.isInteger(index) || index < 0 || index > maxIndex || seen.has(index)) {
-				continue;
-			}
-			seen.add(index);
-			unique.push(index);
+		if (update.point === 'start') {
+			setContentRangeStart(update.range, mapped.ref, mapped.offset);
 		}
-
-		unique.sort((a, b) => a - b);
-
-		const cleaned = [];
-		for (const index of unique) {
-			if (used.has(index)) {
-				continue;
-			}
-			cleaned.push(index);
-		}
-
-		if (cleaned.length < 2) {
-			continue;
-		}
-
-		for (const index of cleaned) {
-			used.add(index);
-		}
-
-		groups.push({ indexes: cleaned, start: cleaned[0] });
-	}
-
-	if (groups.length === 0) {
-		return structure;
-	}
-
-	groups.sort((a, b) => b.start - a.start);
-
-	const indexToGroup = new Map();
-	for (const group of groups) {
-		for (const index of group.indexes) {
-			indexToGroup.set(index, group);
+		else {
+			setContentRangeEnd(update.range, mapped.ref, mapped.offset);
 		}
 	}
+}
 
-	const newContent = [];
-	const indexMap = new Map();
-	const childIndexMaps = new Map();
-	const childTextOffsetMaps = new Map();
-	const mergedTextNodeCounts = new Map();
-
-	const ensureChildMap = (blockIndex) => {
-		let map = childIndexMaps.get(blockIndex);
-		if (!map) {
-			map = [];
-			childIndexMaps.set(blockIndex, map);
-		}
-		return map;
-	};
-
-	const ensureChildOffsetMap = (blockIndex) => {
-		let map = childTextOffsetMaps.get(blockIndex);
-		if (!map) {
-			map = [];
-			childTextOffsetMaps.set(blockIndex, map);
-		}
-		return map;
-	};
-
-	const getTextNodeLength = (node) => {
-		if (!node || typeof node.text !== 'string') {
-			return null;
-		}
-		return node.text.length;
-	};
-
-	const mergeGroup = (group) => {
-		const mergedIndex = newContent.length;
-		const baseBlock = originalContent[group.start];
-		const mergedContent = [];
-		const contentMeta = [];
-
-		for (const blockIndex of group.indexes) {
-			const block = originalContent[blockIndex];
-			const blockContent = Array.isArray(block?.content) ? block.content : [];
-
-			for (let i = 0; i < blockContent.length; i++) {
-				mergedContent.push(blockContent[i]);
-				contentMeta.push({ blockIndex, childIndex: i });
-			}
-		}
-
-		let currentTextNode = null;
-		let currentMergedIndex = -1;
-		let nextMergedIndex = 0;
-		let currentTextOffset = 0;
-
-		for (let i = 0; i < mergedContent.length; i++) {
-			const node = mergedContent[i];
-			const meta = contentMeta[i];
-			const isTextNode = node && typeof node.text === 'string';
-
-			if (!isTextNode) {
-				currentTextNode = null;
-				currentMergedIndex = nextMergedIndex++;
-				currentTextOffset = 0;
-			} else if (!currentTextNode || !canMergeTextNodes(currentTextNode, node)) {
-				currentTextNode = node;
-				currentMergedIndex = nextMergedIndex++;
-				currentTextOffset = 0;
-			}
-
-			const map = ensureChildMap(meta.blockIndex);
-			map[meta.childIndex] = currentMergedIndex;
-
-			if (isTextNode) {
-				const length = getTextNodeLength(node);
-				const offsetMap = ensureChildOffsetMap(meta.blockIndex);
-				if (length != null) {
-					offsetMap[meta.childIndex] = { offsetStart: currentTextOffset, length };
-					currentTextOffset += length;
-				}
-
-				const mergedCount = mergedTextNodeCounts.get(currentMergedIndex) ?? 0;
-				mergedTextNodeCounts.set(currentMergedIndex, mergedCount + 1);
-			}
-		}
-
-		mergeSequentialTextNodes(mergedContent);
-
-		const mergedBlock = baseBlock
-			? { ...baseBlock, content: mergedContent }
-			: { content: mergedContent };
-
-		const blocksInGroup = group.indexes.map(idx => originalContent[idx]);
-		const combinedRects = mergePageRects(blocksInGroup);
-		if (combinedRects) {
-			mergedBlock.anchor = { ...mergedBlock.anchor, pageRects: combinedRects };
-		}
-
-		for (const blockIndex of group.indexes) {
-			indexMap.set(blockIndex, mergedIndex);
-		}
-
-		newContent.push(mergedBlock);
-	};
-
-	for (let i = 0; i < originalContent.length; i++) {
-		const group = indexToGroup.get(i);
-
-		if (group) {
-			if (group.start !== i) {
-				continue;
-			}
-			mergeGroup(group);
-			continue;
-		}
-
-		const newIndex = newContent.length;
-		newContent.push(originalContent[i]);
-		indexMap.set(i, newIndex);
+function startsWithRef(ref, prefix) {
+	if (!Array.isArray(ref) || !Array.isArray(prefix) || prefix.length > ref.length) {
+		return false;
 	}
-
-	const isLeaf = (node) => !node || !node.content || node.content.length === 0;
-
-	const firstLeafPath = (node, path) => {
-		let current = node;
-		let currentPath = [...path];
-		while (current && !isLeaf(current)) {
-			current = current.content[0];
-			currentPath.push(0);
+	for (let i = 0; i < prefix.length; i++) {
+		if (ref[i] !== prefix[i]) {
+			return false;
 		}
-		return current ? currentPath : null;
-	};
-
-	const lastLeafPath = (node, path) => {
-		let current = node;
-		let currentPath = [...path];
-		while (current && !isLeaf(current)) {
-			const children = current.content;
-			const lastIndex = children.length - 1;
-			current = children[lastIndex];
-			currentPath.push(lastIndex);
-		}
-		return current ? currentPath : null;
-	};
-
-	const getBlockLeafPath = (block, useFirst) => {
-		const content = block && Array.isArray(block.content) ? block.content : null;
-		if (!content || content.length === 0) {
-			return null;
-		}
-
-		const startIndex = useFirst ? 0 : content.length - 1;
-		return useFirst
-			? firstLeafPath(content[startIndex], [startIndex])
-			: lastLeafPath(content[startIndex], [startIndex]);
-	};
-
-	const mapChildPath = (blockIndex, childPath) => {
-		if (!Array.isArray(childPath) || childPath.length === 0) {
-			return null;
-		}
-		const childMap = childIndexMaps.get(blockIndex);
-		const mappedFirst = childMap ? childMap[childPath[0]] : childPath[0];
-		if (!Number.isInteger(mappedFirst)) {
-			return null;
-		}
-		return [mappedFirst, ...childPath.slice(1)];
-	};
-
-	const blockRangeMap = new Map();
-
-	for (let i = 0; i < originalContent.length; i++) {
-		const newIndex = indexMap.get(i);
-		if (!Number.isInteger(newIndex)) {
-			continue;
-		}
-		const block = originalContent[i];
-		const startChild = getBlockLeafPath(block, true);
-		const endChild = getBlockLeafPath(block, false);
-		const mappedStartChild = mapChildPath(i, startChild);
-		const mappedEndChild = mapChildPath(i, endChild);
-		const startRef = mappedStartChild ? [newIndex, ...mappedStartChild] : null;
-		const endRef = mappedEndChild ? [newIndex, ...mappedEndChild] : null;
-		const oldStartRef = startChild ? [i, ...startChild] : null;
-		const oldEndRef = endChild ? [i, ...endChild] : null;
-		blockRangeMap.set(i, { startRef, endRef, oldStartRef, oldEndRef });
 	}
+	return true;
+}
 
-	const mapRefPath = (ref) => {
-		if (!Array.isArray(ref) || ref.length === 0) {
-			return ref;
-		}
+function sameRef(a, b) {
+	return Array.isArray(a)
+		&& Array.isArray(b)
+		&& a.length === b.length
+		&& a.every((value, index) => value === b[index]);
+}
 
-		const oldIndex = ref[0];
-		const newIndex = indexMap.get(oldIndex);
-		if (!Number.isInteger(newIndex)) {
-			return ref;
-		}
-
-		const mapped = [newIndex];
-		if (ref.length > 1) {
-			const childMap = childIndexMaps.get(oldIndex);
-			const mappedChild = childMap ? childMap[ref[1]] : ref[1];
-			if (Number.isInteger(mappedChild)) {
-				mapped.push(mappedChild, ...ref.slice(2));
-			} else {
-				mapped.push(...ref.slice(1));
-			}
-		}
-		return mapped;
-	};
-
-	const updateRefPath = (ref) => {
-		const mapped = mapRefPath(ref);
-		if (!Array.isArray(ref) || !Array.isArray(mapped)) {
-			return;
-		}
-		ref.length = 0;
-		ref.push(...mapped);
-	};
-
-	const updateRefsArray = (refs) => {
-		if (!Array.isArray(refs)) {
-			return;
-		}
-		for (const ref of refs) {
-			updateRefPath(ref);
-		}
-	};
-
-	const updateNodeRefs = (node) => {
+function getTextSegments(root, rootRef) {
+	const segments = [];
+	let currentOffset = 0;
+	const visit = (node, localRef) => {
 		if (!node || typeof node !== 'object') {
 			return;
 		}
-
-		if (Array.isArray(node.ref)) {
-			updateRefPath(node.ref);
+		if (typeof node.text === 'string') {
+			const start = currentOffset;
+			const end = start + node.text.length;
+			segments.push({
+				ref: [...rootRef, ...localRef],
+				start,
+				end,
+				length: node.text.length,
+			});
+			currentOffset = end;
+			return;
 		}
-
-		updateRefsArray(node.refs);
-		updateRefsArray(node.backRefs);
-
-		if (Array.isArray(node.content)) {
-			for (const child of node.content) {
-				updateNodeRefs(child);
-			}
+		if (!Array.isArray(node.content)) {
+			return;
 		}
-
-		if (Array.isArray(node.children)) {
-			for (const child of node.children) {
-				updateNodeRefs(child);
-			}
+		for (let i = 0; i < node.content.length; i++) {
+			visit(node.content[i], [...localRef, i]);
 		}
 	};
+	visit(root, []);
+	return segments;
+}
 
-	const getMergedTextNodeCount = (ref) => {
-		if (!Array.isArray(ref) || ref.length < 2) {
-			return 0;
-		}
-		const oldIndex = ref[0];
-		const childIndex = ref[1];
-		const childMap = childIndexMaps.get(oldIndex);
-		const mergedIndex = childMap ? childMap[childIndex] : null;
-		if (!Number.isInteger(mergedIndex)) {
-			return 0;
-		}
-		return mergedTextNodeCounts.get(mergedIndex) ?? 0;
-	};
-
-	const getOffsetInfo = (ref) => {
-		if (!Array.isArray(ref) || ref.length < 2) {
-			return null;
-		}
-		const oldIndex = ref[0];
-		const childIndex = ref[1];
-		const offsetMap = childTextOffsetMaps.get(oldIndex);
-		const entry = offsetMap ? offsetMap[childIndex] : null;
-		if (!entry || !Number.isInteger(entry.offsetStart) || !Number.isInteger(entry.length)) {
-			return null;
-		}
-		return entry;
-	};
-
-	const mapOffset = (ref, offset, isEnd) => {
-		const hasOffset = Number.isInteger(offset);
-		const needsOffset = hasOffset || getMergedTextNodeCount(ref) > 1;
-		if (!needsOffset) {
-			return null;
-		}
-
-		const info = getOffsetInfo(ref);
-		if (info) {
-			if (hasOffset) {
-				return info.offsetStart + offset;
+function getAbsoluteOffsetForBoundary(block, blockRef, targetRef, targetOffset) {
+	const segments = getTextSegments(block, blockRef);
+	for (let i = 0; i < segments.length; i++) {
+		const segment = segments[i];
+		if (sameRef(segment.ref, targetRef)) {
+			if (Number.isInteger(targetOffset)) {
+				return segment.start + Math.max(0, Math.min(targetOffset, segment.length));
 			}
-			return info.offsetStart + (isEnd ? Math.max(0, info.length - 1) : 0);
+			return segment.start;
 		}
-
-		return hasOffset ? offset : null;
-	};
-
-	structure.content = newContent;
-
-	for (const block of structure.content) {
-		updateNodeRefs(block);
-	}
-
-	if (Array.isArray(structure.catalog.pages)) {
-		for (const page of structure.catalog.pages) {
-			if (!page || !Array.isArray(page.contentRanges)) {
-				continue;
-			}
-
-			const updatedRanges = [];
-
-			for (const range of page.contentRanges) {
-				const { start, end } = splitContentRange(range, originalContent);
-				const startRef = start.ref;
-				const endRef = end.ref;
-				const startIndex = Array.isArray(startRef) ? startRef[0] : null;
-				const endIndex = Array.isArray(endRef) ? endRef[0] : null;
-
-				if (!Number.isInteger(startIndex) || !Number.isInteger(endIndex) || startIndex > endIndex) {
-					let startOffset = undefined;
-					let endOffset = undefined;
-					if (startRef) {
-						startOffset = mapOffset(startRef, start.offset, false);
-						updateRefPath(startRef);
-					}
-					if (endRef) {
-						endOffset = mapOffset(endRef, end.offset, true);
-						updateRefPath(endRef);
-					}
-					if (Array.isArray(startRef) && Array.isArray(endRef)) {
-						updatedRanges.push(makeContentRange(startRef, endRef, startOffset, endOffset));
-					}
-					continue;
-				}
-
-				const expanded = [];
-				for (let i = startIndex; i <= endIndex; i++) {
-					const segment = blockRangeMap.get(i);
-					const mappedStart = i === startIndex ? mapRefPath(startRef) : segment?.startRef;
-					const mappedEnd = i === endIndex ? mapRefPath(endRef) : segment?.endRef;
-					const oldStartRef = i === startIndex ? startRef : segment?.oldStartRef;
-					const oldEndRef = i === endIndex ? endRef : segment?.oldEndRef;
-
-					expanded.push({
-						oldIndex: i,
-						startRef: mappedStart ?? segment?.startRef ?? null,
-						endRef: mappedEnd ?? segment?.endRef ?? null,
-						oldStartRef,
-						oldEndRef,
-						startOffset: i === startIndex ? start.offset : undefined,
-						endOffset: i === endIndex ? end.offset : undefined
-					});
-				}
-
-				let runStart = 0;
-				for (let i = 1; i <= expanded.length; i++) {
-					const prev = expanded[i - 1];
-					const prevNewIndex = indexMap.get(prev.oldIndex);
-					const curr = expanded[i];
-					const currNewIndex = curr ? indexMap.get(curr.oldIndex) : null;
-					const isConsecutive = curr && Number.isInteger(prevNewIndex) && Number.isInteger(currNewIndex)
-						&& prevNewIndex + 1 === currNewIndex;
-
-					if (!curr || !isConsecutive) {
-						const first = expanded[runStart];
-						const last = expanded[i - 1];
-						const startNewIndex = indexMap.get(first.oldIndex);
-						const endNewIndex = indexMap.get(last.oldIndex);
-
-						const autoRangeParts = Number.isInteger(startNewIndex) && Number.isInteger(endNewIndex)
-							? splitContentRange(
-								getContentRangeFromBlocks(structure.content, startNewIndex, endNewIndex),
-								structure.content
-							)
-							: {
-								start: { ref: null, offset: undefined },
-								end: { ref: null, offset: undefined },
-							};
-
-						let rangeStartRef = first.startRef ? [...first.startRef] : autoRangeParts.start.ref;
-						let rangeEndRef = last.endRef ? [...last.endRef] : autoRangeParts.end.ref;
-
-						if (Array.isArray(rangeStartRef) && Number.isInteger(startNewIndex)) {
-							rangeStartRef[0] = startNewIndex;
-						}
-						if (Array.isArray(rangeEndRef) && Number.isInteger(endNewIndex)) {
-							rangeEndRef[0] = endNewIndex;
-						}
-
-						const startOffset = mapOffset(
-							first.oldStartRef,
-							first.oldIndex === startIndex ? first.startOffset : null,
-							false
-						);
-						const endOffset = mapOffset(
-							last.oldEndRef,
-							last.oldIndex === endIndex ? last.endOffset : null,
-							true
-						);
-
-						if (Array.isArray(rangeStartRef) && Array.isArray(rangeEndRef)) {
-							updatedRanges.push(makeContentRange(
-								rangeStartRef,
-								rangeEndRef,
-								startOffset,
-								endOffset,
-							));
-						}
-
-						runStart = i;
-					}
-				}
-			}
-
-			page.contentRanges = updatedRanges;
+		if (startsWithRef(segment.ref, targetRef)) {
+			// Half-open boundaries that ref a container resolve to the
+			// container's first character for both start and end points.
+			return segment.start;
 		}
 	}
 
-	return structure;
+	for (let i = 0; i < segments.length; i++) {
+		const segment = segments[i];
+		if (compareRefs(segment.ref, targetRef) >= 0) {
+			return segment.start;
+		}
+	}
+	return segments.length ? segments[segments.length - 1].end : 0;
+}
+
+function getBoundaryForAbsoluteOffset(block, blockRef, absoluteOffset, forceOffset) {
+	const segments = getTextSegments(block, blockRef);
+	if (!segments.length) {
+		return { ref: [...blockRef], offset: undefined };
+	}
+
+	const totalLength = segments[segments.length - 1].end;
+	const offset = Math.max(0, Math.min(absoluteOffset, totalLength));
+
+	if (!forceOffset) {
+		for (const segment of segments) {
+			if (segment.start === offset) {
+				return { ref: segment.ref, offset: undefined };
+			}
+		}
+	}
+
+	for (const segment of segments) {
+		if (offset >= segment.start && offset <= segment.end) {
+			return {
+				ref: segment.ref,
+				offset: forceOffset || offset !== segment.start ? offset - segment.start : undefined,
+			};
+		}
+	}
+
+	const last = segments[segments.length - 1];
+	return {
+		ref: last.ref,
+		offset: forceOffset ? last.length : undefined,
+	};
+}
+
+function compareRefs(a, b) {
+	const length = Math.min(a.length, b.length);
+	for (let i = 0; i < length; i++) {
+		if (a[i] !== b[i]) {
+			return a[i] - b[i];
+		}
+	}
+	return a.length - b.length;
 }

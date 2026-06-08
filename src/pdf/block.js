@@ -4,7 +4,6 @@
 
 import { parseTextMap, buildRunData } from './decode.js';
 import { isWhitespaceChar, sameRef } from './utils.js';
-import { makeContentRange } from '../range.js';
 
 function mapTextToRuns(text, runData) {
 	const rects = [];
@@ -213,44 +212,6 @@ export function getTextNodesAtRange(structure, blockRef, offsetStart, offsetEnd)
 	walkTextNodesWithRefs(block, []);
 
 	return results;
-}
-
-/**
- * Get content range refs from block indexes.
- */
-export function getContentRangeFromBlocks(content, startOffset, endOffset) {
-	const isLeaf = (node) => !node || !node.content || node.content.length === 0;
-
-	const firstLeafPath = (node, path) => {
-		let current = node;
-		let currentPath = [...path];
-		while (current && !isLeaf(current)) {
-			current = current.content[0];
-			currentPath.push(0);
-		}
-		return current ? currentPath : null;
-	};
-
-	const lastLeafPath = (node, path) => {
-		let current = node;
-		let currentPath = [...path];
-		while (current && !isLeaf(current)) {
-			const children = current.content;
-			const lastIndex = children.length - 1;
-			current = children[lastIndex];
-			currentPath.push(lastIndex);
-		}
-		return current ? currentPath : null;
-	};
-
-	const maxIndex = content.length - 1;
-	const safeStart = Number.isInteger(startOffset) ? Math.max(0, Math.min(startOffset, maxIndex)) : 0;
-	const safeEnd = Number.isInteger(endOffset) ? Math.max(0, Math.min(endOffset, maxIndex)) : maxIndex;
-
-	const startRef = firstLeafPath(content[safeStart], [safeStart]);
-	const endRef = lastLeafPath(content[safeEnd], [safeEnd]);
-
-	return makeContentRange(startRef, endRef);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

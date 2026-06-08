@@ -1,7 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyTextAttributes, mergeBlocks } from '../src/pdf/block-transform.js';
+import { applyTextAttributes } from '../src/pdf/block-transform.js';
 import { parseTextMap, buildRunData } from '../src/pdf/decode.js';
+import { mergeSequentialTextNodes } from '../src/pdf/text-node.js';
+import { getFulltextFromStructuredText } from '../src/fulltext.js';
 
 // Build a textMap with one position per non-whitespace character.
 // All chars share the same line bbox; widths are simple per-char widths or
@@ -85,43 +87,95 @@ describe('applyTextAttributes textMap slicing', () => {
 			[[25, 30], [30, 35], [40, 45], [45, 50]],
 			'after maps to e, f, g, h rects');
 	});
-});
 
-describe('mergeBlocks content range remapping', () => {
-	it('uses logical text lengths instead of textMap position counts', () => {
-		const textMap = makeTextMap([
-			{ x1: 0, x2: 5 },
-			{ x1: 10, x2: 15 },
-		]);
+	it('keeps half-open contentRange text offsets stable when text nodes split', () => {
 		const structure = {
-			content: [
-				{
-					type: 'paragraph',
-					content: [{
-						text: 'a b',
-						anchor: { textMap },
-					}],
-				},
-				{
-					type: 'paragraph',
-					content: [{
-						text: 'c',
-						anchor: {
-							textMap: makeTextMap([{ x1: 20, x2: 25 }]),
-						},
-					}],
-				},
-			],
 			catalog: {
-				pages: [{
-					contentRanges: [[[1, 0, 0], [1, 0, 0]]],
-				}],
+				pages: [{ contentRange: [[0, 0, 3], [1]] }],
 			},
+			content: [{
+				type: 'paragraph',
+				content: [{ text: 'abcdef' }],
+			}],
 		};
 
-		mergeBlocks(structure, [[0, 1]]);
+		assert.equal(getFulltextFromStructuredText(structure, [0]), 'def');
 
-		assert.equal(structure.content[0].content[0].text, 'a bc');
-		assert.deepEqual(structure.catalog.pages[0].contentRanges, [[[0, 0, 3], [0, 0, 3]]]);
+		applyTextAttributes(structure, [0], 0, 0, node => ({ ...node, refs: [[9]] }));
+
+		assert.deepEqual(structure.content[0].content.map(node => node.text), ['a', 'bcdef']);
+		assert.deepEqual(structure.catalog.pages[0].contentRange, [[0, 1, 2], [1]]);
+		assert.equal(getFulltextFromStructuredText(structure, [0]), 'def');
+	});
+
+	it('keeps a container end boundary exclusive when text nodes split', () => {
+		const structure = {
+			catalog: {
+				pages: [{ contentRange: [[0], [0, 1]] }],
+			},
+			content: [{
+				type: 'list',
+				content: [
+					{ type: 'listitem', content: [{ text: 'Hello world' }] },
+					{ type: 'listitem', content: [{ text: 'Second item' }] },
+				],
+			}],
+		};
+
+		assert.equal(getFulltextFromStructuredText(structure, [0]), 'Hello world');
+
+		applyTextAttributes(structure, [0], 2, 4, node => ({ ...node, refs: [[1]] }));
+
+		assert.deepEqual(structure.catalog.pages[0].contentRange, [[0], [0, 1, 0]]);
+		assert.equal(getFulltextFromStructuredText(structure, [0]), 'Hello world');
+	});
+
+	it('canonicalizes sliced textMap numbers', () => {
+		const structure = {
+			content: [{
+				type: 'paragraph',
+				content: [{
+					text: 'abc',
+					anchor: {
+						textMap: JSON.stringify([[
+							0, 0, 108, 0, 120, 10,
+							4.300000000000011,
+							4.399999999999977,
+							3.3000000000000114,
+						]]),
+					},
+				}],
+			}],
+		};
+
+		applyTextAttributes(structure, [0], 1, 1, node => ({ ...node, refs: [[1]] }));
+
+		const textMap = structure.content[0].content[1].anchor.textMap;
+		assert.equal(textMap.includes('00000000000'), false);
+		assert.equal(textMap, '[[0,0,108,0,120,10,[4.3,4.4]]]');
+	});
+
+	it('canonicalizes merged textMap numbers', () => {
+		const content = [
+			{
+				text: 'a',
+				anchor: {
+					textMap: '[[0,0,108,0,120,10,4.300000000000011]]',
+				},
+			},
+			{
+				text: 'b',
+				anchor: {
+					textMap: '[[0,0,108,0,120,10,[4.300000000000011,4.399999999999977]]]',
+				},
+			},
+		];
+
+		mergeSequentialTextNodes(content);
+
+		assert.equal(content.length, 1);
+		assert.equal(content[0].text, 'ab');
+		assert.equal(content[0].anchor.textMap.includes('00000000000'), false);
+		assert.equal(content[0].anchor.textMap, '[[0,0,108,0,120,10,4.3],[0,0,108,0,120,10,[4.3,4.4]]]');
 	});
 });
