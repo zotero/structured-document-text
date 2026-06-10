@@ -730,9 +730,7 @@
           "$ref": "#/$defs/Anchor"
         },
         "refs": { "$ref": "#/$defs/RefsArray" },
-        "backRefs": { "$ref": "#/$defs/BackRefsArray" },
-        "previousPart": { "$ref": "#/$defs/PartRef" },
-        "nextPart": { "$ref": "#/$defs/PartRef" }
+        "backRefs": { "$ref": "#/$defs/BackRefsArray" }
       }
     },
     "TableRowNode": {
@@ -757,9 +755,7 @@
           "$ref": "#/$defs/Anchor"
         },
         "refs": { "$ref": "#/$defs/RefsArray" },
-        "backRefs": { "$ref": "#/$defs/BackRefsArray" },
-        "previousPart": { "$ref": "#/$defs/PartRef" },
-        "nextPart": { "$ref": "#/$defs/PartRef" }
+        "backRefs": { "$ref": "#/$defs/BackRefsArray" }
       }
     },
     "TableNode": {

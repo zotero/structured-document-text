@@ -1,5 +1,8 @@
-import { deflateSync, strToU8 } from 'fflate';
-import { concatUint8Arrays } from './bytes.js';
+import {
+	concatUint8Arrays,
+	isByteBuffer,
+	toUint8Array,
+} from './bytes.js';
 import { encodeContentChunk } from './chunk.js';
 import {
 	encodeHeader,
@@ -8,20 +11,22 @@ import {
 
 const TARGET_RAW_CHUNK_BYTES = 32 * 1024;
 const LARGE_BLOCK_WARNING_RAW_BYTES = 64 * 1024;
-const DEFLATE_LEVEL = 6;
 const MAX_PACK_BYTES = 0xffffffff;
 const SOURCE_HASH_RE = /^[0-9a-f]{32}$/u;
 const VERSION_RE = /^[0-9]+\.[0-9]+\.[0-9]+$/u;
+const TEXT_ENCODER = new TextEncoder();
 
 export function packStructuredDocumentText(structure, options = {}) {
 	validateStructure(structure);
 
 	let {
 		destructive = false,
+		deflate,
 	} = options;
+	deflate = normalizeDeflate(deflate);
 
-	let metadataBytes = deflateJson(structure.metadata);
-	let catalogBytes = deflateJson(structure.catalog);
+	let metadataBytes = deflateJson(structure.metadata, deflate);
+	let catalogBytes = deflateJson(structure.catalog, deflate);
 	let contentChunks = [];
 	let contentLength = 0;
 	let { content } = structure;
@@ -36,7 +41,7 @@ export function packStructuredDocumentText(structure, options = {}) {
 		if (!currentBlocks.length) {
 			return;
 		}
-		contentLength = appendContentChunk(contentChunks, contentLength, currentBlocks);
+		contentLength = appendContentChunk(contentChunks, contentLength, currentBlocks, deflate);
 		chunkByteOffsets.push(contentLength);
 		chunkBlockStarts.push(chunkBlockStarts[chunkBlockStarts.length - 1] + currentBlocks.length);
 		currentBlocks = [];
@@ -45,7 +50,7 @@ export function packStructuredDocumentText(structure, options = {}) {
 
 	for (let i = 0; i < content.length; i++) {
 		let block = content[i];
-		let blockBytes = strToU8(JSON.stringify(block));
+		let blockBytes = TEXT_ENCODER.encode(JSON.stringify(block));
 		if (destructive) {
 			content[i] = null;
 		}
@@ -56,7 +61,7 @@ export function packStructuredDocumentText(structure, options = {}) {
 				oversizedCount++;
 				largestOversizedBlockBytes = Math.max(largestOversizedBlockBytes, blockBytes.byteLength);
 			}
-			contentLength = appendContentChunk(contentChunks, contentLength, [blockBytes]);
+			contentLength = appendContentChunk(contentChunks, contentLength, [blockBytes], deflate);
 			chunkByteOffsets.push(contentLength);
 			chunkBlockStarts.push(i + 1);
 			continue;
@@ -106,12 +111,12 @@ export function packStructuredDocumentText(structure, options = {}) {
 	return bytes.buffer;
 }
 
-function deflateJson(value) {
+function deflateJson(value, deflate) {
 	let json = JSON.stringify(value);
-	return deflate(strToU8(json));
+	return deflate(TEXT_ENCODER.encode(json));
 }
 
-function appendContentChunk(contentChunks, contentLength, blockByteArrays) {
+function appendContentChunk(contentChunks, contentLength, blockByteArrays, deflate) {
 	let payload = encodeContentChunk(blockByteArrays);
 	let chunkBytes = deflate(payload);
 	let nextContentLength = contentLength + chunkBytes.byteLength;
@@ -122,8 +127,17 @@ function appendContentChunk(contentChunks, contentLength, blockByteArrays) {
 	return nextContentLength;
 }
 
-function deflate(bytes) {
-	return deflateSync(bytes, { level: DEFLATE_LEVEL });
+function normalizeDeflate(deflate) {
+	if (typeof deflate !== 'function') {
+		throw new TypeError('Expected SDTPack raw DEFLATE deflate function');
+	}
+	return (bytes) => {
+		let compressed = deflate(bytes);
+		if (isByteBuffer(compressed)) {
+			return toUint8Array(compressed);
+		}
+		throw new TypeError('Expected SDTPack deflate function to return Uint8Array or ArrayBuffer');
+	};
 }
 
 function validateStructure(structure) {

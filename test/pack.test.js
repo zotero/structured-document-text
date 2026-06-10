@@ -3,19 +3,25 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import vm from 'node:vm';
+import { deflateRawSync, inflateRawSync } from 'node:zlib';
 import { discoverFixtures } from './helpers.js';
 import { openStructuredDocumentTextPack } from '../src/pack/reader.js';
 import { packStructuredDocumentText } from '../src/pack/writer.js';
 import {
 	decodeIndex,
+	getCatalogRange,
 	getContentStart,
+	getMetadataRange,
 	HEADER_SIZE,
 	readHeader,
 } from '../src/pack/format.js';
 import { encodeContentChunk, getBlockBytesFromContentChunk } from '../src/pack/chunk.js';
 import { writeU32LE } from '../src/pack/bytes.js';
+import { SDT_PACK_VERSION } from '../src/version.js';
 
 const fixtures = discoverFixtures();
+const FRONT_MATTER_READ_BYTES = 64 * 1024;
 
 describe('SDTPack', () => {
 	for (const { format, name, data } of fixtures) {
@@ -23,14 +29,14 @@ describe('SDTPack', () => {
 			it('roundtrips through materialize()', async () => {
 				let structure = packableFixture(data);
 				let buffer = packQuiet(structure);
-				let reader = await openStructuredDocumentTextPack(buffer);
+				let reader = await openPack(buffer);
 				assert.deepEqual(await reader.materialize(), structure);
 			});
 
 			it('reads top-level blocks lazily', async () => {
 				let structure = packableFixture(data);
 				let buffer = packQuiet(structure);
-				let reader = await openStructuredDocumentTextPack(buffer);
+				let reader = await openPack(buffer);
 				let indexes = sampleIndexes(structure.content.length);
 				for (let index of indexes) {
 					assert.deepEqual(await reader.getBlock([index]), structure.content[index]);
@@ -44,16 +50,17 @@ describe('SDTPack', () => {
 					return;
 				}
 				let buffer = packQuiet(structure);
-				let reader = await openStructuredDocumentTextPack(buffer);
+				let reader = await openPack(buffer);
 				assert.deepEqual(await reader.getBlock(ref), getNodeByRef(structure.content, ref));
 			});
 
-			it('reads page blocks from contentRanges', async () => {
+			it('reads page blocks from half-open content ranges', async () => {
 				let structure = packableFixture(data);
 				let buffer = packQuiet(structure);
-				let reader = await openStructuredDocumentTextPack(buffer);
+				let reader = await openPack(buffer);
+				assert.equal(reader.getTopLevelBlockCount(), structure.content.length);
 				for (let pageIndex of sampleIndexes(structure.catalog.pages?.length || 0)) {
-					assert.deepEqual(await readExpectedPageBlocks(reader, structure, pageIndex), getExpectedPageBlocks(structure, pageIndex));
+					assert.deepEqual(await reader.getPageBlocks(pageIndex), getExpectedPageBlocks(structure, pageIndex));
 				}
 			});
 		});
@@ -65,7 +72,7 @@ describe('SDTPack', () => {
 		let buffer = packQuiet(input, { destructive: true });
 		assert.equal(input.content.length, original.content.length);
 		assert(input.content.every(block => block === null));
-		let reader = await openStructuredDocumentTextPack(buffer);
+		let reader = await openPack(buffer);
 		assert.deepEqual(await reader.materialize(), original);
 	});
 
@@ -88,8 +95,36 @@ describe('SDTPack', () => {
 			content: [],
 		};
 		let buffer = packQuiet(structure);
-		let reader = await openStructuredDocumentTextPack(buffer);
+		let reader = await openPack(buffer);
 		assert.deepEqual(await reader.getCatalog(), structure.catalog);
+		assert.deepEqual(await reader.materialize(), structure);
+	});
+
+	it('accepts cross-realm byte source reads', async () => {
+		let structure = createTinyStructure();
+		let buffer = packQuiet(structure);
+		let foreignBytes = vm.runInNewContext(
+			'Uint8Array.from(bytes)',
+			{ bytes: Array.from(new Uint8Array(buffer)) }
+		);
+		let reader = await openPack({
+			byteLength: foreignBytes.byteLength,
+			async read(offset, length) {
+				return foreignBytes.slice(offset, offset + length).buffer;
+			},
+		});
+		assert.deepEqual(await reader.materialize(), structure);
+	});
+
+	it('accepts cross-realm deflate output', async () => {
+		let structure = createTinyStructure();
+		let toForeignBytes = vm.runInNewContext('(bytes) => Uint8Array.from(bytes)');
+		let buffer = packStructuredDocumentText(structure, {
+			deflate(bytes) {
+				return toForeignBytes(Array.from(deflateRawSync(bytes)));
+			},
+		});
+		let reader = await openPack(buffer);
 		assert.deepEqual(await reader.materialize(), structure);
 	});
 
@@ -103,7 +138,7 @@ describe('SDTPack', () => {
 			Array.from(bytes.subarray(0, 8)),
 			[0x89, 0x53, 0x44, 0x54, 0x0d, 0x0a, 0x1a, 0x0a]
 		);
-		assert.equal(bytes[8], 1, 'pack version');
+		assert.equal(bytes[8], SDT_PACK_VERSION, 'pack version');
 		assert.deepEqual(Array.from(bytes.subarray(9, 12)), [1, 0, 0], 'schema version bytes');
 		assert.equal(readTestU32LE(bytes, 12), header.indexLength);
 		assert.deepEqual(
@@ -160,37 +195,46 @@ describe('SDTPack', () => {
 		let structure = packableFixture(fixtures[0].data);
 		let buffer = packQuiet(structure);
 		let source = createTrackedByteSource(buffer);
-		let header = readHeader(new Uint8Array(buffer).subarray(0, HEADER_SIZE));
-		let reader = await openStructuredDocumentTextPack(source);
+		let { header, index } = readPackIndex(buffer);
+		let reader = await openPack(source);
 
-		assert.deepEqual(source.reads[0], { offset: 0, length: HEADER_SIZE });
-		assert.deepEqual(source.reads[1], { offset: HEADER_SIZE, length: header.indexLength });
-		assert.equal(source.reads.length, 2);
+		assert.deepEqual(source.reads, [{
+			offset: 0,
+			length: getFrontMatterReadLength(source),
+		}]);
 		assertNoFullFileReads(source);
 
 		source.clearReads();
 		assert.equal((await reader.getMetadata()).processor.type, structure.metadata.processor.type);
-		assert.equal(source.reads.length, 1);
+		assert.equal(source.reads.length, getRangeReadCount(source, getMetadataRange(header, index)));
+		assertNoFullFileReads(source);
+
+		source.clearReads();
+		assert.deepEqual(await reader.getMetadata(), structure.metadata);
+		assert.equal(source.reads.length, 0);
+
+		source.clearReads();
+		assert.deepEqual(await reader.getCatalog(), structure.catalog);
+		assert.equal(source.reads.length, getRangeReadCount(source, getCatalogRange(header, index)));
 		assertNoFullFileReads(source);
 
 		source.clearReads();
 		assert.deepEqual(await reader.getCatalog(), structure.catalog);
-		assert.equal(source.reads.length, 1);
-		assertNoFullFileReads(source);
+		assert.equal(source.reads.length, 0);
 
 		source.clearReads();
 		assert.deepEqual(await reader.getBlock([0]), structure.content[0]);
-		assert.equal(source.reads.length, 1);
+		assert.ok(source.reads.length <= 1);
 		assertNoFullFileReads(source);
 
 		source.clearReads();
-		assert.deepEqual(await readExpectedPageBlocks(reader, structure, 0), getExpectedPageBlocks(structure, 0));
-		assert.ok(source.reads.length >= 1);
+		assert.deepEqual(await reader.getPageBlocks(0), getExpectedPageBlocks(structure, 0));
+		assert.ok(source.reads.length <= 1);
 		assertNoFullFileReads(source);
 
 		source.clearReads();
 		assert.deepEqual(await reader.materialize(), structure);
-		assert.ok(source.reads.length >= 1);
+		assert.ok(source.reads.length <= 1);
 		assertNoFullFileReads(source);
 	});
 
@@ -205,27 +249,28 @@ describe('SDTPack', () => {
 			file = await fs.open(filePath, 'r');
 			let { size } = await file.stat();
 			let source = createFileByteSource(file, size);
-			let reader = await openStructuredDocumentTextPack(source);
+			let { header, index } = readPackIndex(buffer);
+			let reader = await openPack(source);
 			assertNoFullFileReads(source);
 
 			source.clearReads();
 			assert.deepEqual(await reader.getMetadata(), structure.metadata);
-			assert.equal(source.reads.length, 1);
+			assert.equal(source.reads.length, getRangeReadCount(source, getMetadataRange(header, index)));
 			assertNoFullFileReads(source);
 
 			source.clearReads();
 			assert.deepEqual(await reader.getCatalog(), structure.catalog);
-			assert.equal(source.reads.length, 1);
+			assert.equal(source.reads.length, getRangeReadCount(source, getCatalogRange(header, index)));
 			assertNoFullFileReads(source);
 
 			source.clearReads();
 			assert.deepEqual(await reader.getBlock([0]), structure.content[0]);
-			assert.equal(source.reads.length, 1);
+			assert.ok(source.reads.length <= 1);
 			assertNoFullFileReads(source);
 
 			source.clearReads();
 			assert.deepEqual(await reader.materialize(), structure);
-			assert.ok(source.reads.length >= 1);
+			assert.ok(source.reads.length <= 1);
 			assertNoFullFileReads(source);
 		}
 		finally {
@@ -274,7 +319,7 @@ describe('SDTPack', () => {
 				},
 			},
 			catalog: {
-				pages: [{ contentRanges: [[[0], [0, 0]]] }],
+				pages: [{ contentRange: [[0], [1]] }],
 				outline: [],
 			},
 			content: [
@@ -285,12 +330,12 @@ describe('SDTPack', () => {
 			],
 		};
 		let warnings = captureWarnings(() => {
-			packStructuredDocumentText(structure);
+			packStructuredDocumentText(structure, { deflate: deflateRaw });
 		});
 		assert.equal(warnings.length, 1);
 		assert.match(warnings[0], /oversized top-level blocks/);
 		let buffer = packQuiet(structure);
-		let reader = await openStructuredDocumentTextPack(buffer);
+		let reader = await openPack(buffer);
 		assert.deepEqual(await reader.materialize(), structure);
 	});
 
@@ -298,22 +343,22 @@ describe('SDTPack', () => {
 		let buffer = packQuiet(packableFixture(fixtures[0].data));
 		let badMagic = new Uint8Array(buffer.slice(0));
 		badMagic[0] = 0;
-		await assert.rejects(() => openStructuredDocumentTextPack(badMagic), /magic/);
+		await assert.rejects(() => openPack(badMagic), /magic/);
 
 		let badVersion = new Uint8Array(buffer.slice(0));
 		badVersion[8] = 2;
-		await assert.rejects(() => openStructuredDocumentTextPack(badVersion), /version/);
+		await assert.rejects(() => openPack(badVersion), /version/);
 	});
 
 	it('rejects invalid header index lengths', async () => {
 		let buffer = packQuiet(packableFixture(fixtures[0].data));
 		let bytes = new Uint8Array(buffer.slice(0));
 		writeU32LE(bytes, 12, 0);
-		await assert.rejects(() => openStructuredDocumentTextPack(bytes), /index length/);
+		await assert.rejects(() => openPack(bytes), /index length/);
 
 		bytes = new Uint8Array(buffer.slice(0));
 		writeU32LE(bytes, 12, 8 + 8 * Math.ceil(bytes.byteLength / 8));
-		await assert.rejects(() => openStructuredDocumentTextPack(bytes), /index bounds/);
+		await assert.rejects(() => openPack(bytes), /index bounds/);
 	});
 
 	it('rejects invalid relative chunk offsets', async () => {
@@ -321,7 +366,7 @@ describe('SDTPack', () => {
 		let corrupted = rewriteIndex(buffer, (indexBytes) => {
 			writeU32LE(indexBytes, 8, 1);
 		});
-		await assert.rejects(() => openStructuredDocumentTextPack(corrupted), /first chunk offset/);
+		await assert.rejects(() => openPack(corrupted), /first chunk offset/);
 	});
 
 	it('rejects index layouts outside the file', async () => {
@@ -329,7 +374,7 @@ describe('SDTPack', () => {
 		let corrupted = rewriteIndex(buffer, (indexBytes) => {
 			writeU32LE(indexBytes, 0, 0xffffffff);
 		});
-		await assert.rejects(() => openStructuredDocumentTextPack(corrupted), /outside file/);
+		await assert.rejects(() => openPack(corrupted), /outside file/);
 	});
 });
 
@@ -361,7 +406,7 @@ function createTinyStructure() {
 			},
 		},
 		catalog: {
-			pages: [{ contentRanges: [[[0], [1]]] }],
+			pages: [{ contentRange: [[0], [2]] }],
 			outline: [],
 		},
 		content: [
@@ -382,6 +427,24 @@ function readTestU32LE(bytes, offset) {
 		+ bytes[offset + 1] * 0x100
 		+ bytes[offset + 2] * 0x10000
 		+ bytes[offset + 3] * 0x1000000) >>> 0;
+}
+
+function readPackIndex(buffer) {
+	let bytes = new Uint8Array(buffer);
+	let header = readHeader(bytes.subarray(0, HEADER_SIZE));
+	let indexBytes = bytes.subarray(HEADER_SIZE, HEADER_SIZE + header.indexLength);
+	return {
+		header,
+		index: decodeIndex(indexBytes),
+	};
+}
+
+function getFrontMatterReadLength(source) {
+	return Math.min(source.byteLength, FRONT_MATTER_READ_BYTES);
+}
+
+function getRangeReadCount(source, { offset, length }) {
+	return offset + length <= getFrontMatterReadLength(source) ? 0 : 1;
 }
 
 function createTrackedByteSource(buffer) {
@@ -417,7 +480,9 @@ function createFileByteSource(file, byteLength) {
 
 function assertNoFullFileReads(source) {
 	for (let read of source.reads) {
-		assert.notEqual(read.length, source.byteLength);
+		if (read.length === source.byteLength) {
+			assert.ok(read.length <= FRONT_MATTER_READ_BYTES);
+		}
 	}
 }
 
@@ -466,60 +531,19 @@ function getNodeByRef(content, ref) {
 
 function getExpectedPageBlocks(structure, pageIndex) {
 	let page = structure.catalog.pages?.[pageIndex];
-	if (!page || !Array.isArray(page.contentRanges)) {
+	let range = page?.contentRange;
+	if (!Array.isArray(range) || range.length !== 2) {
 		return [];
 	}
-	let intervals = [];
-	for (let range of page.contentRanges) {
-		let start = range?.[0]?.[0];
-		let end = range?.[1]?.[0];
-		if (!Number.isInteger(start) || !Number.isInteger(end)) {
-			continue;
-		}
-		if (end >= start) {
-			intervals.push([start, end]);
-		}
-	}
-	intervals.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-	let blocks = [];
-	let lastEnd = -1;
-	for (let [start, end] of intervals) {
-		start = Math.max(start, lastEnd + 1);
-		for (let i = start; i <= end; i++) {
-			blocks.push(structure.content[i]);
-		}
-		lastEnd = Math.max(lastEnd, end);
-	}
-	return blocks;
-}
-
-async function readExpectedPageBlocks(reader, structure, pageIndex) {
-	let page = structure.catalog.pages?.[pageIndex];
-	if (!page || !Array.isArray(page.contentRanges)) {
+	let startIndex = range[0]?.[0];
+	let end = range[1];
+	if (!Number.isInteger(startIndex) || !Array.isArray(end)) {
 		return [];
 	}
-	let blocks = [];
-	let lastEnd = -1;
-	for (let [start, end] of getPageTopLevelBlockIntervals(page)) {
-		start = Math.max(start, lastEnd + 1);
-		blocks.push(...await reader.getBlocks(start, end));
-		lastEnd = Math.max(lastEnd, end);
-	}
-	return blocks;
-}
-
-function getPageTopLevelBlockIntervals(page) {
-	let intervals = [];
-	for (let range of page.contentRanges) {
-		let start = range?.[0]?.[0];
-		let end = range?.[1]?.[0];
-		if (!Number.isInteger(start) || !Number.isInteger(end) || end < start) {
-			continue;
-		}
-		intervals.push([start, end]);
-	}
-	intervals.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-	return intervals;
+	let endIndexExclusive = end.length === 1 ? end[0] : end[0] + 1;
+	startIndex = Math.max(0, Math.min(startIndex, structure.content.length));
+	endIndexExclusive = Math.max(startIndex, Math.min(endIndexExclusive, structure.content.length));
+	return structure.content.slice(startIndex, endIndexExclusive);
 }
 
 function captureWarnings(fn) {
@@ -537,10 +561,22 @@ function captureWarnings(fn) {
 	return warnings;
 }
 
+function openPack(input) {
+	return openStructuredDocumentTextPack(input, { inflate: inflateRaw });
+}
+
+function deflateRaw(bytes) {
+	return new Uint8Array(deflateRawSync(bytes));
+}
+
+function inflateRaw(bytes) {
+	return new Uint8Array(inflateRawSync(bytes));
+}
+
 function packQuiet(structure, options) {
 	let result;
 	captureWarnings(() => {
-		result = packStructuredDocumentText(structure, options);
+		result = packStructuredDocumentText(structure, { ...options, deflate: deflateRaw });
 	});
 	return result;
 }

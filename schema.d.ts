@@ -452,8 +452,6 @@ export interface TableRowNode {
   anchor: Anchor;
   refs?: RefsArray;
   backRefs?: BackRefsArray;
-  previousPart?: PartRef;
-  nextPart?: PartRef;
 }
 /**
  * Table cell container (header or data cell).
@@ -486,8 +484,6 @@ export interface TableCellNode {
   anchor: Anchor;
   refs?: RefsArray;
   backRefs?: BackRefsArray;
-  previousPart?: PartRef;
-  nextPart?: PartRef;
 }
 /**
  * Shared caption block (for tables, figures, images, groups, etc.).

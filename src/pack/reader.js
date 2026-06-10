@@ -1,5 +1,5 @@
-import { inflateSync, strFromU8 } from 'fflate';
 import { getBlockBytesFromContentChunk } from './chunk.js';
+import { getContentRangeBlockSpan } from '../range.js';
 import {
 	HEADER_SIZE,
 	decodeIndex,
@@ -10,46 +10,72 @@ import {
 	readHeader,
 	validatePackLayout,
 } from './format.js';
-import { toUint8Array } from './bytes.js';
+import {
+	isByteBuffer,
+	toUint8Array,
+} from './bytes.js';
 
-export function openStructuredDocumentTextPack(input) {
-	return StructuredDocumentTextPackReader.open(input);
+const TEXT_DECODER = new TextDecoder();
+const FRONT_MATTER_READ_BYTES = 64 * 1024;
+
+export function openStructuredDocumentTextPack(input, options = {}) {
+	return StructuredDocumentTextPackReader.open(input, options);
 }
 
 class StructuredDocumentTextPackReader {
-	static async open(input) {
+	static async open(input, options = {}) {
 		let source = normalizeByteSource(input);
+		let inflate = normalizeInflate(options.inflate);
 		if (source.byteLength < HEADER_SIZE) {
 			throw new Error('Invalid SDTPack: file too small');
 		}
 
-		let headerBytes = await readExactly(source, 0, HEADER_SIZE);
-		let header = readHeader(headerBytes);
+		let frontMatterBytes = await readExactly(
+			source,
+			0,
+			Math.min(source.byteLength, FRONT_MATTER_READ_BYTES)
+		);
+		let header = readHeader(frontMatterBytes);
 		if (HEADER_SIZE + header.indexLength > source.byteLength) {
 			throw new Error('Invalid SDTPack index bounds');
 		}
 
-		let indexBytes = await readExactly(source, HEADER_SIZE, header.indexLength);
+		let indexEnd = HEADER_SIZE + header.indexLength;
+		let indexBytes = indexEnd <= frontMatterBytes.byteLength
+			? frontMatterBytes.subarray(HEADER_SIZE, indexEnd)
+			: await readExactly(source, HEADER_SIZE, header.indexLength);
 		let index = decodeIndex(indexBytes);
 		validatePackLayout(header, index, source.byteLength);
 
-		return new StructuredDocumentTextPackReader(source, header, index);
+		return new StructuredDocumentTextPackReader(source, header, index, inflate, frontMatterBytes);
 	}
 
-	constructor(source, header, index) {
+	constructor(source, header, index, inflate, frontMatterBytes) {
 		this.source = source;
 		this.header = header;
 		this.index = index;
+		this._inflate = inflate;
+		this._frontMatterBytes = frontMatterBytes;
+		this._metadataPromise = null;
+		this._catalogPromise = null;
 	}
 
 	async getMetadata() {
-		let { offset, length } = getMetadataRange(this.header, this.index);
-		return parseJsonBytes(inflateSync(await this._readRange(offset, length)));
+		if (!this._metadataPromise) {
+			this._metadataPromise = this._readJsonRange(getMetadataRange(this.header, this.index));
+		}
+		return this._metadataPromise;
 	}
 
 	async getCatalog() {
-		let { offset, length } = getCatalogRange(this.header, this.index);
-		return parseJsonBytes(inflateSync(await this._readRange(offset, length)));
+		if (!this._catalogPromise) {
+			this._catalogPromise = this._readJsonRange(getCatalogRange(this.header, this.index));
+		}
+		return this._catalogPromise;
+	}
+
+	getTopLevelBlockCount() {
+		return this.index.chunkBlockStarts[this.index.chunkBlockStarts.length - 1];
 	}
 
 	async getBlock(ref) {
@@ -102,7 +128,7 @@ class StructuredDocumentTextPackReader {
 		for (let chunkIndex = chunkStart; chunkIndex <= chunkEnd; chunkIndex++) {
 			let chunkOffset = this.index.chunkByteOffsets[chunkIndex] - compressedStart;
 			let nextChunkOffset = this.index.chunkByteOffsets[chunkIndex + 1] - compressedStart;
-			let chunkBytes = inflateSync(compressedBytes.subarray(chunkOffset, nextChunkOffset));
+			let chunkBytes = this._inflate(compressedBytes.subarray(chunkOffset, nextChunkOffset));
 			let firstBlock = this.index.chunkBlockStarts[chunkIndex];
 			let blockCount = this.index.chunkBlockStarts[chunkIndex + 1] - firstBlock;
 			let localStart = Math.max(startBlock - firstBlock, 0);
@@ -112,6 +138,21 @@ class StructuredDocumentTextPackReader {
 			}
 		}
 		return blocks;
+	}
+
+	async getPageBlocks(pageIndex) {
+		if (!Number.isInteger(pageIndex) || pageIndex < 0) {
+			return [];
+		}
+		let catalog = await this.getCatalog();
+		let pages = Array.isArray(catalog?.pages) ? catalog.pages : [];
+		let page = pages[pageIndex];
+		let totalTopLevelBlocks = this.getTopLevelBlockCount();
+		let span = getContentRangeBlockSpan(page?.contentRange, totalTopLevelBlocks);
+		if (!span || span.startIndex >= span.endIndexExclusive) {
+			return [];
+		}
+		return this.getBlocks(span.startIndex, span.endIndexExclusive - 1);
 	}
 
 	async materialize() {
@@ -125,7 +166,7 @@ class StructuredDocumentTextPackReader {
 		for (let chunkIndex = 0; chunkIndex < this.index.chunkByteOffsets.length - 1; chunkIndex++) {
 			let chunkOffset = this.index.chunkByteOffsets[chunkIndex];
 			let nextChunkOffset = this.index.chunkByteOffsets[chunkIndex + 1];
-			let chunkBytes = inflateSync(compressedContent.subarray(chunkOffset, nextChunkOffset));
+			let chunkBytes = this._inflate(compressedContent.subarray(chunkOffset, nextChunkOffset));
 			let blockCount = this._getChunkBlockCount(chunkIndex);
 			for (let local = 0; local < blockCount; local++) {
 				content.push(parseJsonBytes(getBlockBytesFromContentChunk(chunkBytes, blockCount, local)));
@@ -160,7 +201,7 @@ class StructuredDocumentTextPackReader {
 		if (offset > nextOffset) {
 			throw new Error('Invalid SDTPack chunk bounds');
 		}
-		return inflateSync(await this._readRange(contentStart + offset, nextOffset - offset));
+		return this._inflate(await this._readRange(contentStart + offset, nextOffset - offset));
 	}
 
 	_getChunkBlockCount(chunkIndex) {
@@ -171,7 +212,14 @@ class StructuredDocumentTextPackReader {
 		if (!Number.isInteger(offset) || !Number.isInteger(length) || offset < 0 || length < 0 || offset + length > this.source.byteLength) {
 			throw new Error('Invalid SDTPack read range');
 		}
+		if (offset + length <= this._frontMatterBytes.byteLength) {
+			return this._frontMatterBytes.subarray(offset, offset + length);
+		}
 		return readExactly(this.source, offset, length);
+	}
+
+	async _readJsonRange({ offset, length }) {
+		return parseJsonBytes(this._inflate(await this._readRange(offset, length)));
 	}
 }
 
@@ -184,7 +232,7 @@ async function readExactly(source, offset, length) {
 }
 
 function normalizeByteSource(input) {
-	if (input instanceof ArrayBuffer || input instanceof Uint8Array) {
+	if (isByteBuffer(input)) {
 		let bytes = toUint8Array(input);
 		return {
 			byteLength: bytes.byteLength,
@@ -204,6 +252,13 @@ function normalizeByteSource(input) {
 	throw new TypeError('Expected ArrayBuffer, Uint8Array, or byte source');
 }
 
+function normalizeInflate(inflate) {
+	if (typeof inflate !== 'function') {
+		throw new TypeError('Expected SDTPack raw DEFLATE inflate function');
+	}
+	return (bytes) => toUint8Array(inflate(toUint8Array(bytes)));
+}
+
 function parseJsonBytes(bytes) {
-	return JSON.parse(strFromU8(bytes));
+	return JSON.parse(TEXT_DECODER.decode(bytes));
 }

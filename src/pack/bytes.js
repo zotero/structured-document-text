@@ -17,15 +17,27 @@ export function concatUint8Arrays(chunks, totalLength = null) {
 }
 
 export function toUint8Array(bytes) {
-	if (bytes instanceof Uint8Array) {
-		return bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
+	if (ArrayBuffer.isView(bytes)) {
+		return isUint8Array(bytes) && bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
 			? bytes
 			: new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 	}
-	if (bytes instanceof ArrayBuffer) {
+	if (isArrayBuffer(bytes)) {
 		return new Uint8Array(bytes);
 	}
 	throw new TypeError('Expected Uint8Array or ArrayBuffer');
+}
+
+export function isByteBuffer(bytes) {
+	return isArrayBuffer(bytes) || ArrayBuffer.isView(bytes);
+}
+
+function isArrayBuffer(bytes) {
+	return Object.prototype.toString.call(bytes) === '[object ArrayBuffer]';
+}
+
+function isUint8Array(bytes) {
+	return Object.prototype.toString.call(bytes) === '[object Uint8Array]';
 }
 
 export function writeU32LE(bytes, offset, value) {

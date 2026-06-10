@@ -1,19 +1,17 @@
 {
   "name": "structured-document-text",
-  "version": "1.0.0",
   "description": "",
   "type": "module",
   "main": "./src/index.js",
   "scripts": {
+    "build:zotero": "node scripts/build-zotero.js",
     "generate:types": "json2ts -i schema.json -o schema.d.ts && node scripts/fix-schema-types.js",
     "test": "node --test 'test/**/*.test.js'",
     "test:update": "UPDATE=1 node --test 'test/**/*.test.js'"
   },
   "private": true,
-  "dependencies": {
-    "fflate": "^0.8.2"
-  },
   "devDependencies": {
+    "esbuild": "^0.25.12",
     "json-schema-to-typescript": "^15.0.4"
   }
 }

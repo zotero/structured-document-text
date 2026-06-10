@@ -4,8 +4,8 @@ import {
 	toUint8Array,
 	writeU32LE,
 } from './bytes.js';
+import { SDT_PACK_VERSION as PACK_VERSION } from '../version.js';
 
-export const PACK_VERSION = 1;
 export const MAGIC = Uint8Array.of(0x89, 0x53, 0x44, 0x54, 0x0d, 0x0a, 0x1a, 0x0a); // \x89SDT\r\n\x1A\n
 export const HEADER_SIZE = 16;
 
@@ -36,6 +36,7 @@ export function readHeader(bytes) {
 		throw new Error(`Unsupported SDTPack version: ${packVersion}`);
 	}
 	let header = {
+		packVersion,
 		schemaVersion: `${bytes[9]}.${bytes[10]}.${bytes[11]}`,
 		indexLength: readU32LE(bytes, 12),
 	};
