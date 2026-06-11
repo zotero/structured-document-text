@@ -26,9 +26,9 @@ export interface StructuredDocumentText {
        */
       type: "pdf" | "epub" | "snapshot";
       /**
-       * Processor version.
+       * Processor output version. Exact matches are used for cache freshness.
        */
-      version: string;
+      version: number;
     };
     /**
      * Creation time in ISO 8601.

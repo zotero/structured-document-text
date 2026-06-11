@@ -34,8 +34,9 @@
               "description": "Processor type."
             },
             "version": {
-              "$ref": "#/$defs/SemVer",
-              "description": "Processor version."
+              "type": "integer",
+              "minimum": 1,
+              "description": "Processor output version. Exact matches are used for cache freshness."
             }
           }
         },

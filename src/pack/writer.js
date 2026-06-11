@@ -156,7 +156,7 @@ function validateStructure(structure) {
 	if (typeof structure.metadata.processor.type !== 'string' || !structure.metadata.processor.type) {
 		throw new TypeError('Expected StructuredDocumentText metadata.processor.type');
 	}
-	if (!VERSION_RE.test(structure.metadata.processor.version)) {
+	if (!Number.isInteger(structure.metadata.processor.version) || structure.metadata.processor.version < 1) {
 		throw new TypeError('Expected StructuredDocumentText metadata.processor.version');
 	}
 	if (typeof structure.metadata.dateCreated !== 'string' || !structure.metadata.dateCreated) {

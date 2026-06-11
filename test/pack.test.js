@@ -80,7 +80,7 @@ describe('SDTPack', () => {
 		let structure = {
 			schemaVersion: '1.0.0',
 			metadata: {
-				processor: { type: 'snapshot', version: '1.0.0' },
+				processor: { type: 'snapshot', version: 1 },
 				dateCreated: '2000-01-01T00:00:00.000Z',
 				source: {
 					contentType: 'text/html',
@@ -297,9 +297,9 @@ describe('SDTPack', () => {
 		);
 	});
 
-	it('rejects non-major-minor-patch processor versions', () => {
+	it('rejects non-integer processor versions', () => {
 		let structure = packableFixture(fixtures[0].data);
-		structure.metadata.processor.version = '1.0.0-draft';
+		structure.metadata.processor.version = '1.0.0';
 		assert.throws(
 			() => packStructuredDocumentText(structure),
 			/metadata\.processor\.version/
@@ -310,7 +310,7 @@ describe('SDTPack', () => {
 		let structure = {
 			schemaVersion: '1.0.0',
 			metadata: {
-				processor: { type: 'snapshot', version: '1.0.0' },
+				processor: { type: 'snapshot', version: 1 },
 				dateCreated: '2000-01-01T00:00:00.000Z',
 				source: {
 					contentType: 'text/html',
@@ -397,7 +397,7 @@ function createTinyStructure() {
 	return {
 		schemaVersion: '1.0.0',
 		metadata: {
-			processor: { type: 'snapshot', version: '1.0.0' },
+			processor: { type: 'snapshot', version: 1 },
 			dateCreated: '2000-01-01T00:00:00.000Z',
 			source: {
 				contentType: 'text/html',
