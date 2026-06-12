@@ -83,7 +83,7 @@ export interface StructuredDocumentText {
    * Top-level block nodes (headings, paragraphs, lists, tables, etc.).
    */
   content: ContentBlockNode[];
-};
+}
 /**
  * Path to the corresponding heading or block in the content tree.
  *

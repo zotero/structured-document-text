@@ -20,11 +20,24 @@ src = src.replace(
 	/export type (\w+) = \{\n\s+\[k: string\]: unknown;\n\} & \{/g,
 	'export interface $1 {'
 );
-// Fix closing }; for converted interfaces (type aliases end with };, interfaces with })
-// The type-to-interface conversion above leaves a trailing }; that should just be }
-// Actually, both type aliases and interfaces end with }, the ; is fine for type aliases
-// but for the ones we converted, the block ends with }; which needs to become just }
-// Let's just leave it — TypeScript accepts }; after interface blocks too.
+// Remove trailing `;` from interfaces to satisfy TS compiler
+{
+	let lines = src.split('\n');
+	let inConvertedInterface = false;
+	for (let i = 0; i < lines.length; i++) {
+		if (/^export interface /.test(lines[i])) {
+			inConvertedInterface = true;
+		}
+		else if (/^export (type|declare) /.test(lines[i])) {
+			inConvertedInterface = false;
+		}
+		else if (lines[i] === '};' && inConvertedInterface) {
+			lines[i] = '}';
+			inConvertedInterface = false;
+		}
+	}
+	src = lines.join('\n');
+}
 
 // 2. Remove standalone numbered intermediate types like:
 //    export type Target1 = { [k: string]: unknown; };
