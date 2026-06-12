@@ -78,6 +78,10 @@ export interface StructuredDocumentText {
      * For EPUB: whether pages represent physical page numbers from the source or synthetic EPUB locations.
      */
     pageMappingType?: "physical" | "locations";
+    /**
+     * For snapshots: skeleton of the source DOM - every element containing extracted text, plus its ancestors - with body text offsets. Lets consumers resolve and generate CssSelector/TextPositionSelector positions rooted at arbitrary elements without access to the source DOM.
+     */
+    domMap?: DomMapNode[];
   };
   /**
    * Top-level block nodes (headings, paragraphs, lists, tables, etc.).
@@ -148,7 +152,7 @@ export type RefsArray = RefPath[];
  */
 export type BackRefsArray = RefPath[];
 /**
- * Link from this node back to the source document. PDF uses PdfAnchor (pageRects/textMap). EPUB and snapshot use DomAnchor with a selectorMap field that compactly encodes source locations. Use the dom/epub and dom/snapshot decode modules to expand and resolve.
+ * Link from this node back to the source document. PDF uses PdfAnchor (pageRects/textMap). EPUB and snapshot use DomAnchor: a selectorMap field that compactly encodes source locations (blocks, EPUB text nodes), or a body text-stream offset (snapshot text nodes, resolved against catalog.domMap). Use the dom/epub decode and dom/snapshot dommap modules to expand and resolve.
  */
 export type Anchor = PdfAnchor | DomAnchor;
 /**
@@ -173,6 +177,23 @@ export type PdfAnchor = {
  * @maxItems 5
  */
 export type PageRect = [number, number, number, number, number];
+/**
+ * Compact anchor for EPUB and snapshot blocks and text nodes. For blocks, selectorMap is an absolute location: EPUB CFI path (starts with '/') or snapshot CSS selector. For EPUB text nodes, selectorMap is a CFI suffix relative to the parent block; multi-entry selectorMaps (from merged adjacent text nodes) are newline-separated 'charLen selectorMap' entries starting with a digit. Snapshot text nodes store `stream` instead: the raw character offset of the DOM text node's start within the body text stream, located via catalog.domMap.
+ */
+export type DomAnchor = {
+  /**
+   * Compact location string. Blocks: absolute (EPUB CFI path starting with '/', or snapshot CSS selector). EPUB text nodes: CFI suffix relative to the parent block.
+   */
+  selectorMap?: string;
+  /**
+   * Snapshot text nodes: offset of the DOM text node's first character within the body text stream (raw original characters, counted like a NodeIterator text walk over <body>). Element positions in the same stream are recorded in catalog.domMap.
+   */
+  stream?: number;
+  /**
+   * Position map between the node's text and the original DOM text it was extracted from (covers whitespace collapsing and NFC normalization). Space-separated 'nfcPos delta' pairs recorded where delta = nfcIdx - origIdx changes. Absent when all positions are 1:1. Decode: origPos = nfcPos - getDelta(deltaMap, nfcPos).
+   */
+  deltaMap?: string;
+};
 /**
  * Reference to the adjacent physical block that is part of the same logical block.
  *
@@ -230,6 +251,43 @@ export interface PageInfo {
   contentRange: PageContentRange;
 }
 /**
+ * One element in the snapshot DOM skeleton (catalog.domMap). `index` is the element's 0-based position among its parent's element children in the full source DOM (not just skeleton nodes). `textStart`/`textLength` locate the element's subtree text within the body text stream. `flags` holds sibling-position bits used for selector generation and matching: 1 = first of its tag, 2 = last of its tag, 4 = last element child.
+ */
+export interface DomMapNode {
+  /**
+   * Lowercase tag name.
+   */
+  tag: string;
+  /**
+   * 0-based index among the parent's element children.
+   */
+  index: number;
+  /**
+   * DOM_MAP_* sibling-position bits. Omitted when 0.
+   */
+  flags?: number;
+  /**
+   * Element id attribute (unescaped).
+   */
+  id?: string;
+  /**
+   * id of the previous element sibling, for matching '#id + tag' selectors.
+   */
+  prevId?: string;
+  /**
+   * Body text-stream offset at element entry.
+   */
+  textStart: number;
+  /**
+   * Raw character length of the element's subtree text.
+   */
+  textLength: number;
+  /**
+   * Skeleton children, in document order. Omitted when empty.
+   */
+  children?: DomMapNode[];
+}
+/**
  * Paragraph block (inline text only).
  */
 export interface ParagraphNode {
@@ -275,19 +333,6 @@ export interface TextStyle {
   sub?: boolean;
   sup?: boolean;
   monospace?: boolean;
-}
-/**
- * Compact anchor for EPUB and snapshot blocks and text nodes. For blocks, selectorMap is an absolute location: EPUB CFI path (starts with '/') or snapshot CSS selector. For text nodes, selectorMap is relative to the parent block: EPUB stores a CFI suffix, snapshot stores '' (same element), a bare offset, a ' > child' suffix, or an absolute selector fallback. Multi-entry selectorMaps (from merged adjacent text nodes) are newline-separated 'charLen selectorMap' entries starting with a digit. Use expandSelectorMap() to resolve relative values and expandBlockAnchor() to reconstruct WADM selectors.
- */
-export interface DomAnchor {
-  /**
-   * Compact location string. Blocks: absolute (EPUB CFI path starting with '/', or snapshot CSS selector). Text nodes: relative to parent block (EPUB CFI suffix, snapshot offset / child suffix / empty).
-   */
-  selectorMap: string;
-  /**
-   * NFC normalization position map. Space-separated 'nfcPos delta' pairs where delta = nfcIdx - origIdx changes. Absent when text is already NFC (all positions 1:1). Decode: origPos = nfcPos - getDelta(deltaMap, nfcPos).
-   */
-  deltaMap?: string;
 }
 /**
  * Heading block (inline text only).

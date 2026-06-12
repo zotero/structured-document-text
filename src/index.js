@@ -13,11 +13,10 @@ export {
 	findCommonCFIPath,
 } from './dom/epub/decode.js';
 
-// Snapshot selectorMap decode
+// Snapshot domMap (selector resolution and generation)
 export {
-	expandBlockAnchor as expandSnapshotBlockAnchor,
-	expandSelectorMap as expandSnapshotSelectorMap,
-	parseSelectorMap as parseSnapshotSelectorMap,
-	parseSelectorMapEntries as parseSnapshotSelectorMapEntries,
-	resolveSelectorMap as resolveSnapshotSelectorMap,
-} from './dom/snapshot/decode.js';
+	buildDomMapIndex,
+	findDomMapContaining,
+	generateDomMapSelector,
+	matchDomMapSelector,
+} from './dom/snapshot/dommap.js';

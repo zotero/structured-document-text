@@ -25,6 +25,15 @@ function parseDeltaMap(deltaMap) {
 	return result;
 }
 
+function getDeltaFromPairs(pairs, nfcPos) {
+	let delta = 0;
+	for (let i = 0; i < pairs.length; i++) {
+		if (pairs[i][0] > nfcPos) break;
+		delta = pairs[i][1];
+	}
+	return delta;
+}
+
 /**
  * Get the running delta at a given NFC position.
  * delta = nfcIdx - origIdx (negative when NFC is shorter than original).
@@ -35,13 +44,7 @@ function parseDeltaMap(deltaMap) {
  */
 export function getDelta(deltaMap, nfcPos) {
 	if (!deltaMap) return 0;
-	let pairs = parseDeltaMap(deltaMap);
-	let delta = 0;
-	for (let i = 0; i < pairs.length; i++) {
-		if (pairs[i][0] > nfcPos) break;
-		delta = pairs[i][1];
-	}
-	return delta;
+	return getDeltaFromPairs(parseDeltaMap(deltaMap), nfcPos);
 }
 
 /**
@@ -69,6 +72,36 @@ export function nfcToOriginalLocal(deltaMap, entryStartNFC, localNFCPos) {
 	let entryDelta = getDelta(deltaMap, entryStartNFC);
 	let posDelta = getDelta(deltaMap, entryStartNFC + localNFCPos);
 	return localNFCPos - (posDelta - entryDelta);
+}
+
+/**
+ * Compose two deltaMaps applied in sequence: `outer` maps positions in the
+ * final text to an intermediate text, `inner` maps the intermediate text to
+ * the original. Returns a deltaMap from final positions straight to original
+ * positions (e.g. NFC -> whitespace-collapsed -> raw DOM text).
+ *
+ * @param {string | undefined} outer - final -> intermediate
+ * @param {string | undefined} inner - intermediate -> original
+ * @param {number} finalLength - character length of the final text
+ * @returns {string} composed deltaMap, or '' when all positions are 1:1
+ */
+export function composeDeltaMaps(outer, inner, finalLength) {
+	if (!outer) return inner || '';
+	if (!inner) return outer;
+	let outerPairs = parseDeltaMap(outer);
+	let innerPairs = parseDeltaMap(inner);
+	let entries = [];
+	let prevDelta = 0;
+	for (let pos = 0; pos <= finalLength; pos++) {
+		let intermediate = pos - getDeltaFromPairs(outerPairs, pos);
+		let original = intermediate - getDeltaFromPairs(innerPairs, intermediate);
+		let delta = pos - original;
+		if (delta !== prevDelta) {
+			entries.push(pos + ' ' + delta);
+			prevDelta = delta;
+		}
+	}
+	return entries.join(' ');
 }
 
 /**
