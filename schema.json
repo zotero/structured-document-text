@@ -965,13 +965,23 @@
           "description": "True if the page was injected by the publisher."
         },
         "viewRect": {
-          "description": "Page view box: [x1, y1, x2, y2] (CropBox, or MediaBox if no CropBox). Values can be negative when the PDF defines a page box with a non-zero origin (e.g. [-50, -50, 562, 742]).",
+          "description": "Effective PDF page view box in default user-space coordinates, before page rotation and UserUnit scaling: [x1, y1, x2, y2]. When CropBox and MediaBox differ and have a non-empty intersection, this is their intersection; otherwise it is MediaBox. Values can be negative when the effective box has a non-zero origin (e.g. [-50, -50, 562, 742]).",
           "type": "array",
           "minItems": 4,
           "maxItems": 4,
           "items": {
             "type": "number"
           }
+        },
+        "rotation": {
+          "type": "integer",
+          "enum": [0, 90, 180, 270],
+          "description": "Effective intrinsic clockwise PDF page rotation, in degrees. In schema 1.1.0 and later, producers omit this property when 0; in earlier schemas, absence does not imply 0."
+        },
+        "userUnit": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Effective PDF UserUnit multiplier; one default user-space unit equals userUnit / 72 inch. In schema 1.1.0 and later, producers omit this property when 1; in earlier schemas, absence does not imply 1."
         },
         "textSource": {
           "type": "string",
