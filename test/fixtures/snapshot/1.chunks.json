@@ -1,42 +1,12 @@
 [
   {
-    "startBlockIndex": 0,
-    "endBlockIndex": 1,
-    "leafBlockCount": 5,
+    "text": "First paragraph with bold and italic text.\n\nSome content in section one.\n\nItem one\n\nItem two\n\nItem three\n\nContent with a link.\n\nDeeper content.\n\nA quoted passage.\n\nHeader 1\n\nHeader 2\n\nCell 1\n\nCell 2\n\nThis should be excluded from outline.\n\nCode block\nwith preserved whitespace\n\nCafé lattés are nice.\n\nViet Nam: Hṍ Chí Minh\n\nKorean: 한글\n\nNormal text, café is NFC but café is NFD, then more normal.\n\nEspañol and Swedish: ångström\n\nÀB́ĈD̃Ë\n\nNFC: café\nNFD: café",
+    "embedText": "Main Title\n\nFirst paragraph with bold and italic text.\n\nMain Title > Section One\n\nSome content in section one.\n\nItem one\n\nItem two\n\nItem three\n\nMain Title > Section Two\n\nContent with a link.\n\nMain Title > Section Two > Subsection\n\nDeeper content.\n\nA quoted passage.\n\nHeader 1\n\nHeader 2\n\nCell 1\n\nCell 2\n\nMain Title > Navigation Heading\n\nThis should be excluded from outline.\n\nCode block\nwith preserved whitespace\n\nMain Title > NFC Stress Tests\n\nCafé lattés are nice.\n\nViet Nam: Hṍ Chí Minh\n\nKorean: 한글\n\nNormal text, café is NFC but café is NFD, then more normal.\n\nEspañol and Swedish: ångström\n\nÀB́ĈD̃Ë\n\nNFC: café\nNFD: café",
+    "tokens": 142,
     "outlinePath": "Main Title",
-    "text": "First paragraph with bold and italic text.",
-    "pageRects": []
-  },
-  {
-    "startBlockIndex": 2,
-    "endBlockIndex": 4,
-    "leafBlockCount": 4,
-    "outlinePath": "Main Title > Section One",
-    "text": "Some content in section one.\nItem one\nItem two\nItem three",
-    "pageRects": []
-  },
-  {
-    "startBlockIndex": 7,
-    "endBlockIndex": 10,
-    "leafBlockCount": 6,
-    "outlinePath": "Main Title > Section Two > Subsection",
-    "text": "Deeper content.\nA quoted passage.\nHeader 1\nHeader 2\nCell 1\nCell 2",
-    "pageRects": []
-  },
-  {
-    "startBlockIndex": 11,
-    "endBlockIndex": 13,
-    "leafBlockCount": 2,
-    "outlinePath": "Main Title > Navigation Heading",
-    "text": "This should be excluded from outline.\nCode block\nwith preserved whitespace",
-    "pageRects": []
-  },
-  {
-    "startBlockIndex": 14,
-    "endBlockIndex": 21,
-    "leafBlockCount": 11,
-    "outlinePath": "Main Title > NFC Stress Tests",
-    "text": "Café lattés are nice.\nViet Nam: Hṍ Chí Minh\nKorean: 한글\nNormal text, café is NFC but café is NFD, then more normal.\nEspañol and Swedish: ångström\nÀB́ĈD̃Ë\nNFC: café\nNFD: café",
-    "pageRects": []
+    "pageLabel": null,
+    "sectionPart": 1,
+    "sectionParts": 1,
+    "anchor": {"selectors":[{"type":"TextPositionSelector","start":14,"end":56},{"type":"TextPositionSelector","start":72,"end":100},{"type":"TextPositionSelector","start":105,"end":113},{"type":"TextPositionSelector","start":116,"end":124},{"type":"TextPositionSelector","start":127,"end":137},{"type":"TextPositionSelector","start":155,"end":175},{"type":"TextPositionSelector","start":190,"end":205},{"type":"TextPositionSelector","start":211,"end":228},{"type":"TextPositionSelector","start":236,"end":252},{"type":"TextPositionSelector","start":255,"end":267},{"type":"TextPositionSelector","start":296,"end":333},{"type":"TextPositionSelector","start":428,"end":464},{"type":"TextPositionSelector","start":488,"end":511},{"type":"TextPositionSelector","start":516,"end":540},{"type":"TextPositionSelector","start":545,"end":559},{"type":"TextPositionSelector","start":564,"end":624},{"type":"TextPositionSelector","start":629,"end":661},{"type":"TextPositionSelector","start":666,"end":676},{"type":"TextPositionSelector","start":681,"end":701}]}
   }
 ]

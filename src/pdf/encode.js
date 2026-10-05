@@ -5,7 +5,7 @@ import {
 	EPS,
 	isVertical,
 } from './constants.js';
-import { stringifyTextMap } from './text-map.js';
+import { optimizeTextMapRun, stringifyTextMap } from './text-map.js';
 
 // ───────────────────────────── Style Helpers ─────────────────────────────
 
@@ -313,6 +313,37 @@ export function charsToTextNodes(pageIndex, chars) {
 
 // ──────────────── Char → TextNode (preformatted / code blocks) ────────────────
 
+function stringifyPreformattedTextMap(runs) {
+	// Glyph coordinates use at most six decimals; remove subtraction noise only.
+	const difference = (end, start) => Math.round((end - start) * 1e6) / 1e6;
+	let compact = [], previous, previousEnd;
+	for (let source of runs) {
+		// Round each glyph as before, then combine compatible runs without a
+		// second quantization that could move individual glyph boundaries.
+		let run = optimizeTextMapRun(source);
+		let along = isVertical((run[0] >> HEADER_AXIS_DIR_SHIFT) & 3) ? 1 : 0;
+		let across = 1 - along;
+		let start = run[along + 2];
+		let widths = run.length > 6 ? run.slice(6) : [difference(run[along + 4], start)];
+		let end = widths.reduce((offset, width) => offset + width, start);
+		if (previous && previous[0] === run[0] && previous[1] === run[1]
+			&& previous[across + 2] === run[across + 2] && previous[across + 4] === run[across + 4]
+			&& start >= previous[along + 2]) {
+			if (previous.length === 6) previous.push(difference(previous[along + 4], previous[along + 2]));
+			let gap = difference(start, previousEnd);
+			previous.push(gap ? [gap, widths[0]] : widths[0]);
+			for (let width of widths.slice(1)) previous.push(width);
+			previous[along + 4] = Math.max(previous[along + 4], run[along + 4]);
+		}
+		else {
+			compact.push(run);
+			previous = run;
+		}
+		previousEnd = end;
+	}
+	return JSON.stringify(compact);
+}
+
 function getPreformattedMonoCharWidth(chars) {
 	const widthCounts = new Map();
 	for (const ch of chars) {
@@ -369,6 +400,8 @@ export function charsToPreformattedTextNodes(pageIndex, chars) {
 	let currentStyle = undefined;
 	let currentStyleRef = null;
 	let textParts = [];
+	let runs = [];
+	let completeGeometry = true;
 
 	const flushNode = () => {
 		if (textParts.length === 0) return;
@@ -376,8 +409,11 @@ export function charsToPreformattedTextNodes(pageIndex, chars) {
 		if (!text) return;
 		const out = { text };
 		if (currentStyle) out.style = currentStyle;
+		if (completeGeometry && runs.length) out.anchor = { textMap: stringifyPreformattedTextMap(runs) };
 		nodes.push(out);
 		textParts = [];
+		runs = [];
+		completeGeometry = true;
 	};
 
 	for (let li = 0; li < lines.length; li++) {
@@ -434,6 +470,21 @@ export function charsToPreformattedTextNodes(pageIndex, chars) {
 			}
 
 			textParts.push(ch.c);
+			// Text maps count non-whitespace UTF-16 units, including zero-width
+			// continuations of a multi-unit glyph. Layout spaces have no geometry.
+			const length = ch.c.replace(/[ \n\t]/g, '').length;
+			if (length) {
+				if (!ch.rect) completeGeometry = false;
+				else {
+					const header = ((ch.axisDir & 0b11) << HEADER_AXIS_DIR_SHIFT) | (ch.rtl ? HEADER_DIR_RTL : 0);
+					const run = [header, pageIndex, ...ch.rect];
+					if (length > 1) {
+						const extent = isVertical(ch.axisDir) ? ch.rect[3] - ch.rect[1] : ch.rect[2] - ch.rect[0];
+						run.push(extent, ...new Array(length - 1).fill(0));
+					}
+					runs.push(run);
+				}
+			}
 
 			if (ch.rect) {
 				prevEnd = ch.rect[2]; // right edge

@@ -1,0 +1,44 @@
+[
+  {
+    "title": "I. INTRODUCTION",
+    "startRef": "2"
+  },
+  {
+    "title": "II. LITERATURE REVIEW",
+    "startRef": "7",
+    "children": [
+      {
+        "title": "Investigation of Assessment and Maturity Stage Models for Assessing the Implementation of Industry 4.0",
+        "startRef": "12"
+      }
+    ]
+  },
+  {
+    "title": "III. RESULTS",
+    "startRef": "18"
+  },
+  {
+    "title": "A. Existing Assessment Models for Industry 4.0",
+    "startRef": "19"
+  },
+  {
+    "title": "B. Existing Maturity Stage Models for Industry 4.0",
+    "startRef": "44"
+  },
+  {
+    "title": "IV. DISCUSSION",
+    "startRef": "75"
+  },
+  {
+    "title": "V. CONCLUSION AND OUTLOOK",
+    "startRef": "80"
+  },
+  {
+    "title": "ACKNOWLEDGMENT",
+    "startRef": "85"
+  },
+  {
+    "title": "REFERENCES",
+    "startRef": "87"
+  }
+]

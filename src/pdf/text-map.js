@@ -1,4 +1,4 @@
-const TEXT_MAP_MAX_GEOMETRY_ERROR = 0.25;
+export const TEXT_MAP_MAX_GEOMETRY_ERROR = 0.25;
 
 function roundShortest(value, maxError) {
 	if (!Number.isFinite(value)) return value;

@@ -1,7 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
+import { discoverFixtures } from '../../helpers.js';
 import {
 	expandSelectorMap,
 	expandBlockAnchor,
@@ -305,25 +304,29 @@ describe('mergeNodesWithSelectorMap', () => {
 	});
 });
 
-let fixtureDir = path.resolve(import.meta.dirname, '../../fixtures/epub');
-let fixtureFiles = fs.readdirSync(fixtureDir).filter(f => /^\d+\.json$/.test(f));
-let fixtures = fixtureFiles.map(f => ({
-	name: f,
-	data: JSON.parse(fs.readFileSync(path.join(fixtureDir, f), 'utf8')),
-}));
+function* walkBlocks(content) {
+	for (let block of content) {
+		if (!Array.isArray(block.content)) continue;
+		yield block;
+		yield* walkBlocks(block.content);
+	}
+}
 
-describe('EPUB decode: roundtrip on real fixture data', () => {
+const fixtures = discoverFixtures().filter(fixture => fixture.format === 'epub');
+
+describe('EPUB decode: real fixture anchors', () => {
 	for (let { name, data } of fixtures) {
+		const blocks = [...walkBlocks(data.content)];
 		it(`${name}: all text node selectorMaps are valid`, () => {
-			for (let block of data.content) {
+			for (let block of blocks) {
 				if (!Array.isArray(block.content)) continue;
 				for (let tn of block.content) {
-					if (!tn.anchor?.selectorMap) continue;
+					if (typeof tn.anchor?.selectorMap !== 'string') continue;
 					let sm = tn.anchor.selectorMap;
-					let isSingle = sm.startsWith('/');
+					let isSingle = sm === '' || sm.startsWith('/');
 					let isMulti = /^\d/.test(sm);
 					assert.ok(isSingle || isMulti,
-						`selectorMap should start with / or digit: ${sm.substring(0, 60)}`);
+						`selectorMap should be empty or start with / or digit: ${sm.substring(0, 60)}`);
 					if (isMulti) {
 						let entries = parseSelectorMapEntries(sm);
 						assert.ok(entries && entries.length >= 2);
@@ -337,12 +340,12 @@ describe('EPUB decode: roundtrip on real fixture data', () => {
 		});
 
 		it(`${name}: expandSelectorMap + resolveSelectorMap produces valid CFIs`, () => {
-			for (let block of data.content) {
+			for (let block of blocks) {
 				if (!Array.isArray(block.content)) continue;
 				let blockSM = block.anchor?.selectorMap;
 				if (!blockSM) continue;
 				for (let tn of block.content) {
-					if (!tn.text || !tn.anchor?.selectorMap) continue;
+					if (!tn.text || typeof tn.anchor?.selectorMap !== 'string') continue;
 					let abs = expandSelectorMap(blockSM, tn.anchor.selectorMap);
 					let point = resolveSelectorMap(abs, 0);
 					assert.match(point.value, /^epubcfi\(\/.*:0\)$/,
@@ -358,7 +361,7 @@ describe('EPUB decode: roundtrip on real fixture data', () => {
 		});
 
 		it(`${name}: block anchors have absolute CFI path selectorMaps`, () => {
-			for (let block of data.content) {
+			for (let block of blocks) {
 				assert.ok(block.anchor, 'block missing anchor');
 				assert.ok(block.anchor.selectorMap, 'block anchor should have selectorMap');
 				assert.match(block.anchor.selectorMap, /^\//);
@@ -369,12 +372,13 @@ describe('EPUB decode: roundtrip on real fixture data', () => {
 		});
 
 		it(`${name}: cross-node range between adjacent text nodes`, () => {
-			for (let block of data.content) {
+			for (let block of blocks) {
 				if (!Array.isArray(block.content) || block.content.length < 2) continue;
 				let blockSM = block.anchor?.selectorMap;
 				if (!blockSM) continue;
 				let nodes = block.content.filter(tn =>
-					tn.text && tn.anchor?.selectorMap && tn.anchor.selectorMap.startsWith('/'));
+					tn.text && typeof tn.anchor?.selectorMap === 'string'
+						&& (tn.anchor.selectorMap === '' || tn.anchor.selectorMap.startsWith('/')));
 				if (nodes.length < 2) continue;
 
 				let a = nodes[0];

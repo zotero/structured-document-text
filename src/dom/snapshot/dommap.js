@@ -23,6 +23,8 @@ export const DOM_MAP_FIRST_OF_TYPE = 1;
 export const DOM_MAP_LAST_OF_TYPE = 2;
 export const DOM_MAP_LAST_CHILD = 4;
 
+const selectorIndexes = new WeakMap();
+
 /**
  * Indexed domMap: skeleton nodes with parent links, plus lookups.
  *
@@ -150,8 +152,25 @@ export function matchDomMapSelector(index, selector) {
 	if (!parsed) {
 		return null;
 	}
+	let candidates = selectorIndexes.get(index);
+	if (!candidates) {
+		candidates = new Map();
+		for (let indexed of index.nodes) {
+			let keys = [indexed.node.tag];
+			if (indexed.node.id) keys.push('#' + cssEscape(indexed.node.id));
+			for (let key of keys) {
+				if (!candidates.has(key)) candidates.set(key, []);
+				candidates.get(key).push(indexed);
+			}
+		}
+		selectorIndexes.set(index, candidates);
+	}
+	// Use the parsed target segment for both narrowing and matching. Ancestor
+	// and sibling constraints still run against every candidate, including duplicates.
+	let target = parsed.segments.at(-1);
+	let key = target.id !== undefined ? '#' + target.id : target.tag;
 	let match = null;
-	for (let indexed of index.nodes) {
+	for (let indexed of candidates.get(key) ?? []) {
 		if (matchesAt(indexed, parsed)) {
 			if (match) {
 				// Ambiguous

@@ -1,4 +1,4 @@
-import { HEADER_AXIS_DIR_SHIFT, isVertical } from './constants.js';
+import { HEADER_AXIS_DIR_SHIFT, HEADER_LAST_IS_SOFT_HYPHEN, isVertical } from './constants.js';
 
 /**
  * Parse textMap JSON string into array of runs.
@@ -15,70 +15,62 @@ export function parseTextMap(textMap) {
 	}
 }
 
+// Internal primitive: callers validate runs and decide which positions to keep.
+// Returning false from visit stops decoding immediately; values remain unfiltered.
+// Optional context lets consumers reuse callbacks across runs.
+export function visitCharPositions(run, visit, dropSoftHyphen = false, context) {
+	const vertical = isVertical((run[0] >> HEADER_AXIS_DIR_SHIFT) & 3);
+	const count = Math.max(1, run.length - 6) - (dropSoftHyphen ? run[0] & HEADER_LAST_IS_SOFT_HYPHEN : 0);
+	let pos = run[vertical ? 3 : 2];
+	if (!count) return true;
+	if (run.length <= 6) return visit(pos, run[vertical ? 5 : 4], context) !== false;
+	for (let i = 6; i < count + 6; i++) {
+		let width = run[i];
+		if (Array.isArray(width)) { pos += width[0]; width = width[1]; }
+		const end = pos + width;
+		if (visit(pos, end, context) === false) return false;
+		pos = end;
+	}
+	return true;
+}
+
 /**
- * Reconstructs character positions from a run array.
+ * Reconstructs character positions from a run array, including soft hyphens.
  * Single-char runs have no widths; position is bbox.
  */
 export function reconstructCharPositions(run) {
 	if (!run || run.length < 6) return [];
-
-	const [header, pageIndex, minX, minY, maxX, maxY, ...widths] = run;
-	const axisDir = (header >> HEADER_AXIS_DIR_SHIFT) & 0b11;
-	const vertical = isVertical(axisDir);
-	const start = vertical ? minY : minX;
-	const end = vertical ? maxY : maxX;
-
-	// Single char: no widths, use full bbox
-	if (widths.length === 0) {
-		return [{ x1: start, x2: end }];
-	}
-
+	// Preserve the existing iterable inputs, including typed arrays.
+	if (!Array.isArray(run)) run = [...run];
 	const positions = [];
-	let pos = start;
-
-	for (const w of widths) {
-		if (Array.isArray(w)) {
-			const [delta, width] = w;
-			pos += delta;
-			positions.push({ x1: pos, x2: pos + width });
-			pos += width;
-		} else {
-			positions.push({ x1: pos, x2: pos + w });
-			pos += w;
-		}
-	}
-
+	visitCharPositions(run, appendPosition, false, positions);
 	return positions;
+}
+
+function appendPosition(x1, x2, positions) {
+	positions.push({ x1, x2 });
 }
 
 /**
  * Build run data with rects and page indexes from parsed runs.
  */
 export function buildRunData(runs) {
-	const data = [];
+	const state = { data: [], run: null, vertical: false };
 	for (const run of runs) {
 		if (!Array.isArray(run) || run.length < 6) {
 			continue;
 		}
-		const [header, pageIndex, minX, minY, maxX, maxY] = run;
-		const axisDir = (header >> HEADER_AXIS_DIR_SHIFT) & 0b11;
-		const vertical = isVertical(axisDir);
-		const positions = reconstructCharPositions(run);
-
-		// Remove soft hyphen position if present
-		if (header & (1 << 0)) { // HEADER_LAST_IS_SOFT_HYPHEN
-			positions.pop();
-		}
-
-		for (const pos of positions) {
-			if (!pos || !Number.isFinite(pos.x1) || !Number.isFinite(pos.x2)) {
-				continue;
-			}
-			const rect = vertical
-				? [minX, pos.x1, maxX, pos.x2]
-				: [pos.x1, minY, pos.x2, maxY];
-			data.push({ rect, pageIndex, vertical });
-		}
+		state.run = run;
+		state.vertical = isVertical((run[0] >> HEADER_AXIS_DIR_SHIFT) & 3);
+		visitCharPositions(run, appendRunData, true, state);
 	}
-	return data;
+	return state.data;
+}
+
+function appendRunData(start, end, { data, run, vertical }) {
+	if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+	const rect = vertical
+		? [run[2], start, run[4], end]
+		: [start, run[3], end, run[5]];
+	data.push({ rect, pageIndex: run[1], vertical });
 }

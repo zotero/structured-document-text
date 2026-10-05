@@ -25,7 +25,7 @@ The default persisted form is a binary `.sdt` pack. JSON is used internally and 
 - Text layer for the Zotero Reader PDF viewer
 - Outline preview outside the Reader (e.g., in the item pane)
 - Structured context for agents
-- Section-level chunking for embeddings
+- Section-level text chunks for embeddings
 - Disk-backed or remote random access (e.g., S3) to large documents
 
 ## SDT Pack
@@ -49,3 +49,12 @@ The header identifies the file as SDT and stores the pack/schema version. The in
 This layout lets consumers read metadata, pages, outline, selected blocks, or the full document depending on what they need, without always loading and parsing the whole structure. Memory use can stay bounded by the sections or chunks being accessed, and small reads remain fast even across many SDT files.
 
 SDT packs are produced by `document-worker`.
+
+## Text chunking
+
+The optional [passage chunker](src/chunker/README.md) splits a materialized SDT
+into excerpts and embedding input with source anchors and on-demand Reader positions. The package
+root and `src/read.js` do not load it. Passage chunks are separate from compressed
+storage chunks.
+
+Run `npm test` with Node.js 24 or newer.
